@@ -1,9 +1,9 @@
-from __future__ import division
+from __future__ import division, print_function, absolute_import
 
 '''
 Author      : Lyubimov, A.Y.
 Created     : 05/01/2016
-Last Changed: 08/31/2018
+Last Changed: 06/07/2019
 Description : PRIME GUI Threading module
 '''
 
@@ -32,9 +32,6 @@ elif (wx.Platform == '__WXMSW__'):
   button_font_size = 11
   LABEL_SIZE = 11
   CAPTION_SIZE = 9
-
-# user = os.getlogin()
-# icons = os.path.join(os.path.dirname(os.path.abspath(ct.__file__)), 'icons/')
 
 def str_split(string, delimiters=(' ', ','), maxsplit=0):
   import re
@@ -88,7 +85,7 @@ class PRIMEThread(Thread):
       cmd = self.command
 
     if self.verbose:
-      print cmd
+      print (cmd)
       easy_run.fully_buffered(cmd, join_stdout_stderr=True).show_stdout()
     else:
       easy_run.fully_buffered(cmd, join_stdout_stderr=True)
