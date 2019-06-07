@@ -73,10 +73,9 @@ conda_platform = {
   'Windows': 'win-64',
 }
 
-version = '36'
-if py2:
-  version = '27'
-default_filename = 'cctbx_py{version}_{platform}.txt'.format(
+version = 'PYTHON_VERSION'
+default_format = '{builder}_py{version}_{platform}.txt'
+default_filename = default_format.format(builder='cctbx',
   version=version, platform=conda_platform[platform.system()])
 
 root_dir = os.path.abspath(
@@ -148,8 +147,12 @@ class conda_manager(object):
   env_locations = {
     'cctbxlite': default_file,
     'cctbx': default_file,
-    'phenix': default_file,
-    'phenix_tng': default_file,
+    'phenix': os.path.join('phenix', 'conda_envs',
+      default_format.format(builder='phenix', version=version,
+                            platform=conda_platform[platform.system()])),
+    'phenix_tng': os.path.join('phenix', 'conda_envs',
+      default_format.format(builder='phenix', version=version,
+                            platform=conda_platform[platform.system()])),
     'xfel': default_file,
     'labelit': default_file,
     'dials': default_file,
