@@ -524,7 +524,7 @@ def calculate_fsc(si=None,
     print >>out,"\nFraction complete (%5.2f) is less than minimum (%5.2f)..." %(
       fraction_complete,min_fraction_complete) + "\nSkipping scaling"
     target_scale_factors=flex.double(target_scale_factors.size()*(1.0,))
-
+  print >>out,"\nAverage CC: %.3f" %(cc_list.min_max_mean().mean)
   print >>out,"\nScale factors vs resolution:"
   print >>out,"Note 1: CC* estimated from sqrt(2*CC/(1+CC))"
   print >>out,"Note 2: CC estimated by fitting (smoothing) for values < %s" %(cc_cut)
