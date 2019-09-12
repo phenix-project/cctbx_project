@@ -59,7 +59,7 @@ namespace scitbx { namespace af {
   sort_permutation(
     const_ref<DataType> const& data,
     bool reverse=false,
-    bool stable=true
+    bool stable=false
     )
   {
     if (stable) {

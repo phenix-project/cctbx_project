@@ -52,7 +52,7 @@ class _():
     print("all:", self.all(), file=f)
     return self
 
-def sorted(data, reverse=False, stable=True):
+def sorted(data, reverse=False, stable=False):
   return data.select(
     sort_permutation(data=data, reverse=reverse, stable=stable))
 
