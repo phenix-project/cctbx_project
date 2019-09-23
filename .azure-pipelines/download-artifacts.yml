@@ -6,7 +6,7 @@ steps:
 #   inputs:
 #     source: 'specific'
 #     project: '$(System.TeamProjectId)'
-#     pipeline: 4
+#     pipeline: 2
 #     artifact: 'chem_data'
 #     path: $(Pipeline.Workspace)/modules/chem_data
 #   displayName: Download chem_data
@@ -15,7 +15,7 @@ steps:
   inputs:
     source: 'specific'
     project: '$(System.TeamProjectId)'
-    pipeline: 4
+    pipeline: 2
     artifact: 'phenix_regression'
     path: $(Pipeline.Workspace)/modules/phenix_regression
   displayName: Download phenix_regression
@@ -24,7 +24,7 @@ steps:
   inputs:
     source: 'specific'
     project: '$(System.TeamProjectId)'
-    pipeline: 4
+    pipeline: 2
     artifact: 'phenix_examples'
     path: $(Pipeline.Workspace)/modules/phenix_examples
   displayName: Download phenix_examples
