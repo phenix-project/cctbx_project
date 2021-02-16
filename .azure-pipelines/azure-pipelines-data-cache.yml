@@ -129,16 +129,16 @@ jobs:
     artifact: phenix_examples
 
   # xfel_regression
-  - task: DownloadPipelineArtifact@2
-    inputs:
-      source: 'specific'
-      project: '$(resources.pipeline.data_cache.projectID)'
-      pipeline: '$(resources.pipeline.data_cache.pipelineID)'
-      allowPartiallySucceededBuilds: true
-      artifact: 'xfel_regression'
-      path: $(System.DefaultWorkingDirectory)/xfel_regression
-    displayName: Download xfel_regression
-    continueOnError: true
+  # - task: DownloadPipelineArtifact@2
+  #   inputs:
+  #     source: 'specific'
+  #     project: '$(resources.pipeline.data_cache.projectID)'
+  #     pipeline: '$(resources.pipeline.data_cache.pipelineID)'
+  #     allowPartiallySucceededBuilds: true
+  #     artifact: 'xfel_regression'
+  #     path: $(System.DefaultWorkingDirectory)/xfel_regression
+  #   displayName: Download xfel_regression
+  #   continueOnError: true
 
   - script: |
       if [ ! -d "$(System.DefaultWorkingDirectory)/xfel_regression" ]; then
