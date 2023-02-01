@@ -1,4 +1,3 @@
-#include <memory>
 #include <cctbx/boost_python/flex_fwd.h>
 #include <boost/python/module.hpp>
 #include <boost/python/class.hpp>
@@ -109,7 +108,7 @@ namespace sx_merging {
     const std::map<std::string, size_t> chunk_lookup;
     const std::vector<dials::af::reflection_table> tables;
     dials::af::shared<int> expt_ids;
-    std::shared_ptr<dials::af::reflection_table::experiment_map_type> expt_map;
+    boost::shared_ptr<dials::af::reflection_table::experiment_map_type> expt_map;
 
     experiment_id_splitter_visitor(dials::af::reflection_table &src_,
                                    dials::af::reflection_table::key_type key_,
