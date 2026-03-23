@@ -20,7 +20,7 @@ def _load_1avd_manager():
   """Load the 1avd structure once and cache the ligand manager.
 
   Returns the validate_ligands.manager for streptavidin (1avd), or None
-  if phenix_regression is not available in this installation.
+  if phenix_regression is not available.
   """
   global _1avd_manager_cache
   if _1avd_manager_cache is not None:
@@ -49,6 +49,7 @@ def run():
   run_test04()
   run_test05()
   run_test06()
+  run_test08()
 
 # ------------------------------------------------------------------------------
 
@@ -249,6 +250,7 @@ def run_test03():
       #
       assert(clashes_result.n_clashes == 1)
       assert approx_equal(clashes_result.clashscore, 9.4, eps=0.5)
+      assert(clashes_result.n_hbonds == 1)
       #
     if (id_str.strip() == 'BTN A 400'):
       assert approx_equal(ccs.rscc, 0.94, eps=0.03)
@@ -265,6 +267,7 @@ def run_test03():
       #
       assert(clashes_result.n_clashes == 4)
       assert approx_equal(clashes_result.clashscore, 13.0, eps=0.5)
+      assert(clashes_result.n_hbonds == 2)
 
       rmsd_result = lr.get_rmsds()
       assert approx_equal(rmsd_result.bond_rmsd, 0.033, eps=0.005)
@@ -292,6 +295,7 @@ def run_test03():
       #
       assert(clashes_result.n_clashes == 6)
       assert approx_equal(clashes_result.clashscore, 19.3, eps=0.5)
+      assert(clashes_result.n_hbonds == 2)
 
       #print(round(clashes_result.clashscore,1))
       #print(adps.b_min_within)
@@ -421,6 +425,58 @@ ATOM     11  HG  SER A   9       8.382   5.000   7.090  1.00 17.71           H
   assert len(dihedral.outliers) == 0
   assert approx_equal(dihedral.mean, 10.91, eps=0.05)
   assert approx_equal(dihedralz.mean, 0.52, eps=0.05)
+
+# ------------------------------------------------------------------------------
+
+def run_test08():
+  '''
+  Test get_map_values():
+  - fofc_map_values size matches non-H atom count
+  - percent_bad_at_atom_centers, n_bad_blobs, percent_bad_blobs
+    are in valid ranges and meaningful for well-fitted ligands
+  '''
+  print('test08')
+  vl_manager = _load_1avd_manager()
+  if vl_manager is None:
+    print('  skipping: phenix_regression not available')
+    return
+
+  for lr in vl_manager:
+    id_str = lr.id_str.strip()
+    map_values = lr.get_map_values()
+
+    # All ligands have fmodel set -> result is never None
+    assert map_values is not None
+
+    # fofc_map_values: one entry per non-H atom (atom count from model file)
+    if id_str == 'BTN A 400':
+      assert map_values.fofc_map_values.size() == 16
+    elif id_str == 'BTN B 401':
+      assert map_values.fofc_map_values.size() == 16
+    elif id_str == 'NAG A 600':
+      assert map_values.fofc_map_values.size() == 14
+
+    # Sanity ranges valid for all ligands
+    assert map_values.percent_bad_at_atom_centers >= 0
+    assert map_values.n_bad_blobs >= 0
+    assert map_values.percent_bad_blobs >= 0
+    assert map_values.percent_bad_blobs <= 100
+
+    if id_str == 'BTN A 400':
+      # Well-fitted ligand: no atoms or blobs in bad density
+      assert map_values.percent_bad_at_atom_centers == 0.0
+      assert map_values.n_bad_blobs == 0
+      assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
+    elif id_str == 'BTN B 401':
+      # Well-fitted; two small difference-density blobs near the ligand
+      assert map_values.percent_bad_at_atom_centers == 0.0
+      assert map_values.n_bad_blobs == 2
+      assert approx_equal(map_values.percent_bad_blobs, 0.546, eps=0.5)
+    elif id_str == 'NAG A 600':
+      # Moderately fitted; no atoms sitting in bad density
+      assert map_values.percent_bad_at_atom_centers == 0.0
+      assert map_values.n_bad_blobs == 0
+      assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
 
 # ------------------------------------------------------------------------------
 
