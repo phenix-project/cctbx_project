@@ -172,7 +172,7 @@ class manager(list):
       {'headers': ['', 'RSCC', 'fragments'], 'width': 40,
        'data_fn': lambda lr: (
            ', '.join(f'{cc:.2f}' for cc in lr.get_ccs().frag_ccs.values())
-           if lr.get_ccs() and lr.get_ccs().frag_ccs else '-'
+           if lr.get_ccs() and getattr(lr.get_ccs(), 'frag_ccs', None) else '-'
        )},
 
       {'headers': ['% bad', 'map values', 'Fo-Fc'], 'width': 12,
@@ -355,7 +355,7 @@ class ligand_result(object):
       '_overlaps'      : 'get_overlaps',
       '_rmsds'         : 'get_rmsds',
       '_ccs'           : 'get_ccs',
-      '_is_suspicious' : 'check_if_suspicious',
+      #'_is_suspicious' : 'check_if_suspicious',
       '_map_values'    : 'get_map_values',
       #'_qmr'           : 'get_qmr',
       #'_polder_ccs'  : 'get_polder_ccs',
@@ -381,42 +381,42 @@ class ligand_result(object):
 
   # ----------------------------------------------------------------------------
 
-  def check_if_suspicious(self):
-    '''
-    If ligand metrics fulfil certain criteria, it is flagged as suspicious
-    '''
-    if self._is_suspicious is not None:
-      return self._is_suspicious
-    #
-    self._is_suspicious = False
-    # get info
-    n_atoms = self._atoms_ligand_noH.size()
-    occs = self.get_occupancies()
-    adps = self.get_adps()
-    clashes = self.get_overlaps()
-    ccs = None
-    map_vals = None
-
-    #if self.fmodel is not None:
-    #  ccs = self.get_ccs()
-    #  map_vals = self.get_map_values()
-    # apply criteria for metrics
-    if ccs is not None:
-      if ccs.rscc < 0.8:
-        self._is_suspicious = True
-    if adps.b_mean_within is not None:
-      if adps.b_mean > 3 * adps.b_mean_within:
-        self._is_suspicious = True
-    if occs.occ_mean == 0.:
-      self._is_suspicious = True
-    if clashes is not None:
-      if clashes.n_clashes > 0.5 * n_atoms:
-        self._is_suspicious = True
-    #if map_vals is not None:
-    #  if (map_vals.fofc_map_values<-3).count(True) >= 0.5 * n_atoms:
-    #    self._is_suspicious = True
-    #
-    return self._is_suspicious
+#  def check_if_suspicious(self):
+#    '''
+#    If ligand metrics fulfil certain criteria, it is flagged as suspicious
+#    '''
+#    if self._is_suspicious is not None:
+#      return self._is_suspicious
+#    #
+#    self._is_suspicious = False
+#    # get info
+#    n_atoms = self._atoms_ligand_noH.size()
+#    occs = self.get_occupancies()
+#    adps = self.get_adps()
+#    clashes = self.get_overlaps()
+#    ccs = None
+#    map_vals = None
+#
+#    #if self.fmodel is not None:
+#    #  ccs = self.get_ccs()
+#    #  map_vals = self.get_map_values()
+#    # apply criteria for metrics
+#    if ccs is not None:
+#      if ccs.rscc < 0.8:
+#        self._is_suspicious = True
+#    if adps.b_mean_within is not None:
+#      if adps.b_mean > 3 * adps.b_mean_within:
+#        self._is_suspicious = True
+#    if occs.occ_mean == 0.:
+#      self._is_suspicious = True
+#    if clashes is not None:
+#      if clashes.n_clashes > 0.5 * n_atoms:
+#        self._is_suspicious = True
+#    #if map_vals is not None:
+#    #  if (map_vals.fofc_map_values<-3).count(True) >= 0.5 * n_atoms:
+#    #    self._is_suspicious = True
+#    #
+#    return self._is_suspicious
 
   # ----------------------------------------------------------------------------
 

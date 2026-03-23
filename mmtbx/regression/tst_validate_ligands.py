@@ -50,6 +50,7 @@ def run():
   run_test05()
   run_test06()
   run_test08()
+  run_test09()
 
 # ------------------------------------------------------------------------------
 
@@ -226,12 +227,23 @@ def run_test03():
     return
 
   for lr in vl_manager:
-    occs = lr.get_occupancies()
     id_str = lr.id_str
+    occs = lr.get_occupancies()
     adps = lr.get_adps()
     ccs = lr.get_ccs()
-    #print(ccs.rscc)
-    clashes_result = lr.get_overlaps()
+    overlaps = lr.get_overlaps()
+    rmsd_result = lr.get_rmsds()
+
+    # get_occupancies(): negative_count and negative_isel
+    assert occs.negative_count == 0
+    assert occs.negative_isel.size() == 0
+
+    # get_adps(): n_zero (no atoms with B < 0.01 for any 1avd ligand)
+    assert adps.n_zero == 0
+
+    # get_overlaps(): n_clashes_sym
+    assert overlaps.n_clashes_sym == 0
+
     #
     if (id_str.strip() == 'NAG A 600'):
       assert approx_equal(ccs.rscc, 0.87, eps=0.03)
@@ -239,6 +251,9 @@ def run_test03():
       assert approx_equal(occs.occ_min, 0, eps=0.01)
       assert approx_equal(occs.occ_max, 1, eps=0.01)
       assert approx_equal(occs.occ_mean, 0.86, eps=0.01)
+      # occ_min == 0 -> at least one atom has occ == 0.0
+      assert occs.zero_count >= 1
+      assert occs.zero_isel.size() == occs.zero_count
       #
       assert approx_equal(adps.b_min, 27.99, eps=0.01)
       assert approx_equal(adps.b_max, 90.00, eps=0.01)
@@ -248,13 +263,21 @@ def run_test03():
       assert approx_equal(adps.b_max_within, 79.14, eps=0.01)
       assert approx_equal(adps.b_mean_within, 35.37, eps=0.02)
       #
-      assert(clashes_result.n_clashes == 1)
-      assert approx_equal(clashes_result.clashscore, 9.4, eps=0.5)
-      assert(clashes_result.n_hbonds == 1)
+      assert(overlaps.n_clashes == 1)
+      assert(overlaps.n_hbonds == 1)
+      assert approx_equal(overlaps.clashscore, 9.4, eps=0.5)
       #
     if (id_str.strip() == 'BTN A 400'):
       assert approx_equal(ccs.rscc, 0.94, eps=0.03)
+      assert isinstance(ccs.frag_ccs, dict)
+      assert len(ccs.frag_ccs) == len(lr.ligand_rigid_components_isels)
+      assert len(ccs.frag_ccs) == 3
+      for cc_val in ccs.frag_ccs.values():
+        assert -1 <= cc_val <= 1
+        assert cc_val > 0.85   # all fragments well-fitted in 1avd
       #
+      assert occs.zero_count == 0
+      assert occs.zero_isel.size() == 0
       assert approx_equal(occs.occ_mean, 1, eps=0.01)
       #
       assert approx_equal(adps.b_min, 4.00, eps=0.01)
@@ -265,24 +288,32 @@ def run_test03():
       assert approx_equal(adps.b_max_within, 54.65, eps=0.01)
       assert approx_equal(adps.b_mean_within, 23.23, eps=0.02)
       #
-      assert(clashes_result.n_clashes == 4)
-      assert approx_equal(clashes_result.clashscore, 13.0, eps=0.5)
-      assert(clashes_result.n_hbonds == 2)
+      assert(overlaps.n_clashes == 4)
+      assert(overlaps.n_hbonds == 2)
+      assert approx_equal(overlaps.clashscore, 13.0, eps=0.5)
 
-      rmsd_result = lr.get_rmsds()
+      assert rmsd_result.bond_n == 17
       assert approx_equal(rmsd_result.bond_rmsd, 0.033, eps=0.005)
       assert approx_equal(rmsd_result.bond_rmsz, 1.639, eps=0.005)
       assert(rmsd_result.bond_n_outliers == 1)
       #
+      assert rmsd_result.angle_n == 23
       assert approx_equal(rmsd_result.angle_rmsd, 4.00, eps=0.05)
       assert approx_equal(rmsd_result.angle_rmsz, 1.33, eps=0.05)
       assert(rmsd_result.angle_n_outliers == 1)
+      #
+      assert rmsd_result.dihedral_n == 20
       assert approx_equal(rmsd_result.dihedral_rmsd, 17.4, eps=0.5)
+      assert approx_equal(rmsd_result.dihedral_rmsz, 0.579, eps=0.1)
       assert approx_equal(rmsd_result.planarity_rmsd, 0.02, eps=0.05)
+      assert rmsd_result.dihedral_n_outliers == 0
+
       #
     if (id_str.strip() == 'BTN B 401'):
       assert approx_equal(ccs.rscc, 0.95, eps=0.03)
       #
+      assert occs.zero_count == 0
+      assert occs.zero_isel.size() == 0
       assert approx_equal(occs.occ_mean, 1, eps=0.01)
       #
       assert approx_equal(adps.b_min, 4.00, eps=0.01)
@@ -293,9 +324,10 @@ def run_test03():
       assert approx_equal(adps.b_max_within, 75.42, eps=0.01)
       assert approx_equal(adps.b_mean_within, 28.20, eps=0.02)
       #
-      assert(clashes_result.n_clashes == 6)
-      assert approx_equal(clashes_result.clashscore, 19.3, eps=0.5)
-      assert(clashes_result.n_hbonds == 2)
+      assert(overlaps.n_clashes == 6)
+      assert(overlaps.n_hbonds == 2)
+      assert approx_equal(overlaps.clashscore, 19.3, eps=0.5)
+
 
       #print(round(clashes_result.clashscore,1))
       #print(adps.b_min_within)
@@ -477,6 +509,82 @@ def run_test08():
       assert map_values.percent_bad_at_atom_centers == 0.0
       assert map_values.n_bad_blobs == 0
       assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
+
+
+# ------------------------------------------------------------------------------
+
+def run_test09():
+  '''
+  Test get_ccs_map() - the map_manager code path of get_ccs().
+  Writes a 2mFo-DFc model map from 1avd to a temp CCP4 file, then runs
+  the program with PDB + map (no MTZ) to exercise the map_manager branch.
+  '''
+  print('test10')
+  from mmtbx import map_tools
+  from cctbx import maptbx, miller
+  from iotbx import mrcfile
+  from cctbx.array_family import flex
+
+  vl_manager = _load_1avd_manager()
+  if vl_manager is None:
+    print('  skipping: phenix_regression not available')
+    return
+
+  pdb_fname = libtbx.env.find_in_repositories(
+    relative_path="phenix_regression/pdb/pdb1avd.ent.gz",
+    test=os.path.isfile)
+  if pdb_fname is None:
+    print('  skipping: phenix_regression not available')
+    return
+
+  # Compute a 2mFo-DFc model map from the 1avd fmodel
+  fmodel = vl_manager[0].fmodel
+  cs = fmodel.f_obs().crystal_symmetry()
+  d_min = round(fmodel.f_obs().d_min(), 2)
+  crystal_gridding = maptbx.crystal_gridding(
+    unit_cell        = cs.unit_cell(),
+    space_group_info = cs.space_group_info(),
+    symmetry_flags   = maptbx.use_space_group_symmetry,
+    step             = 0.6)
+  map_coefficients = map_tools.electron_density_map(
+    fmodel=fmodel).map_coefficients(
+      map_type     = "2mFo-DFc",
+      isotropize   = True,
+      fill_missing = False)
+  fft_map = miller.fft_map(
+    crystal_gridding     = crystal_gridding,
+    fourier_coefficients = map_coefficients)
+  fft_map.apply_sigma_scaling()
+  map_data = fft_map.real_map_unpadded()
+
+  map_fn = "tst09_1avd.ccp4"
+  try:
+    mrcfile.write_ccp4_map(
+      file_name   = map_fn,
+      unit_cell   = cs.unit_cell(),
+      space_group = cs.space_group(),
+      map_data    = map_data,
+      labels      = flex.std_string([""]))
+    result = run_program(
+      program_class = val_lig.Program,
+      args          = [pdb_fname, map_fn,
+                       'validate_ligands.resolution=%s' % d_min],
+      logger        = null_out())
+    vl_manager2 = result.ligand_manager
+    assert vl_manager2 is not None
+    for lr in vl_manager2:
+      ccs = lr.get_ccs()
+      assert ccs is not None
+      # get_ccs_map() returns group_args(rscc=cc) with no frag_ccs
+      assert hasattr(ccs, 'rscc')
+      assert not hasattr(ccs, 'frag_ccs')
+      assert -1 <= ccs.rscc <= 1
+      if lr.id_str.strip() == 'BTN A 400':
+        # Well-fitted ligand: CC with its own model map should be positive
+        assert ccs.rscc > 0.5
+  finally:
+    if os.path.isfile(map_fn):
+      os.remove(map_fn)
 
 # ------------------------------------------------------------------------------
 
