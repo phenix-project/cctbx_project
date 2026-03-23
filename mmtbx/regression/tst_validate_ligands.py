@@ -14,6 +14,34 @@ lg.setLevel(RDLogger.CRITICAL) # Only show critical errors
 
 # ------------------------------------------------------------------------------
 
+_1avd_manager_cache = None  # populated lazily by _load_1avd_manager()
+
+def _load_1avd_manager():
+  """Load the 1avd structure once and cache the ligand manager.
+
+  Returns the validate_ligands.manager for streptavidin (1avd), or None
+  if phenix_regression is not available in this installation.
+  """
+  global _1avd_manager_cache
+  if _1avd_manager_cache is not None:
+    return _1avd_manager_cache
+  mtz_fname = libtbx.env.find_in_repositories(
+    relative_path="phenix_regression/reflection_files/1avd.mtz",
+    test=os.path.isfile)
+  pdb_fname = libtbx.env.find_in_repositories(
+    relative_path="phenix_regression/pdb/pdb1avd.ent.gz",
+    test=os.path.isfile)
+  if mtz_fname is None or pdb_fname is None:
+    return None
+  result = run_program(
+    program_class=val_lig.Program,
+    args=[pdb_fname, mtz_fname],
+    logger=null_out())
+  _1avd_manager_cache = result.ligand_manager
+  return _1avd_manager_cache
+
+# ------------------------------------------------------------------------------
+
 def run():
   run_test01()
   run_test02()
@@ -191,22 +219,10 @@ def run_test03():
   - occupancy calculations for ligands
   '''
   print('test03')
-  mtz_fname = libtbx.env.find_in_repositories(
-    relative_path="phenix_regression/reflection_files/1avd.mtz",
-    test=os.path.isfile)
-  pdb_fname = libtbx.env.find_in_repositories(
-    relative_path="phenix_regression/pdb/pdb1avd.ent.gz",
-    test=os.path.isfile)
-  args=[pdb_fname, mtz_fname]
-  #
-  #print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
-  try:
-    result = run_program(program_class=val_lig.Program,args=args,
-     logger = null_out())
-  except Exception as e:
-    msg = traceback.format_exc()
-
-  vl_manager = result.ligand_manager
+  vl_manager = _load_1avd_manager()
+  if vl_manager is None:
+    print('  skipping: phenix_regression not available')
+    return
 
   for lr in vl_manager:
     occs = lr.get_occupancies()
