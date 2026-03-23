@@ -351,13 +351,13 @@ class ligand_result(object):
     self._result_attrs = {
       '_occupancies'   : 'get_occupancies',
       '_adps'          : 'get_adps',
-      '_owab'          : 'get_owab',
+      #'_owab'          : 'get_owab',
       '_overlaps'      : 'get_overlaps',
       '_rmsds'         : 'get_rmsds',
       '_ccs'           : 'get_ccs',
       '_is_suspicious' : 'check_if_suspicious',
       '_map_values'    : 'get_map_values',
-      '_qmr'           : 'get_qmr',
+      #'_qmr'           : 'get_qmr',
       #'_polder_ccs'  : 'get_polder_ccs',
     }
 
@@ -370,8 +370,6 @@ class ligand_result(object):
     for attr, func in self._result_attrs.items():
       setattr(self, attr, None)
       assert hasattr(self, func)
-
-
 
   # ----------------------------------------------------------------------------
 
@@ -493,7 +491,7 @@ class ligand_result(object):
       negative_isel       = (occ<0).iselection(),
       zero_count          = (flex.abs(occ)<eps).count(True),
       zero_isel           = (flex.abs(occ)<eps).iselection(),
-      less_than_dot9_isel = (occ<0.9).iselection()
+
       )
 
     return self._occupancies
