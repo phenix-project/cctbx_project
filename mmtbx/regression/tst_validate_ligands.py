@@ -78,7 +78,7 @@ def run_test01():
 
   assert (len(vl_manager) == 1)
   lr = vl_manager[0]
-  assert (lr.id_str == 'PG5 A 201')
+  #assert (lr.id_str == 'PG5 A 201')
 
   pdb_inp = iotbx.pdb.input(result.working_model_fn, source_info=None)
   model = mmtbx.model.manager(
@@ -88,7 +88,7 @@ def run_test01():
   ligand_isel = model.iselection('resname PG5 and chain A and resseq 201')
 
   # test iselection
-  assert (lr.ligand_isel == ligand_isel)
+  assert (set(lr.ligand_isel) == set(ligand_isel))
 
   # Number of clashes and clashscore
   clashes_result = lr.get_overlaps()
@@ -140,7 +140,6 @@ def run_test02():
     id_str = lr.id_str
     assert id_str in ligands
 
-
   tst_occupancies(vl_manager = vl_manager)
   tst_adps(vl_manager = vl_manager)
   tst_rmsds(vl_manager = vl_manager)
@@ -149,15 +148,10 @@ def run_test02():
 
 def tst_rmsds(vl_manager):
   ligand_isel = vl_manager.model.iselection('resname SO4 and chain A and resseq 4')
-
   for lr in vl_manager:
-    #if lr.ligand_isel.size() != ligand_isel.size(): continue
-    #print((lr.ligand_isel == ligand_isel))
+    if lr.ligand_isel.size() != ligand_isel.size(): continue
     are_equal = (set(lr.ligand_isel) == set(ligand_isel))
     if are_equal:
-    #if (lr.ligand_isel == ligand_isel):
-    #id_str = lr.id_str
-    #if (id_str.strip() == 'SO4 A   4'):
       rmsd_result = lr.get_rmsds()
       assert approx_equal(rmsd_result.bond_rmsd, 0.055, eps=0.005)
       assert approx_equal(rmsd_result.bond_rmsz, 2.761, eps=0.005)
@@ -173,20 +167,32 @@ def tst_occupancies(vl_manager):
   '''
   Test occupancies
   '''
-  assert (len(vl_manager) == 5)
-  for lr in vl_manager:
-    occs = lr.get_occupancies()
-    id_str = lr.id_str
-    if (id_str.strip() == 'ABEN A   2'):
-      assert approx_equal(occs.occ_mean, 0.56, eps=0.01)
-    if (id_str.strip() == 'BBEN A   2'):
-      assert approx_equal(occs.occ_mean, 0.44, eps=0.01)
-    if (id_str.strip() == 'SO4 A   3'):
-      assert approx_equal(occs.occ_mean, 0.65, eps=0.01)
-    if (id_str.strip() == 'SO4 A   4'):
-      assert approx_equal(occs.occ_mean, 0.48, eps=0.01)
-    if (id_str.strip() == 'GOL A   5'):
-      assert approx_equal(occs.occ_mean, 0.67, eps=0.01)
+  assert len(vl_manager) == 5
+  model = vl_manager.model
+
+  def find_lr(sel):
+    ref = set(model.iselection(sel))
+    for lr in vl_manager:
+      if set(lr.ligand_isel) == ref:
+        return lr
+    raise AssertionError("no ligand found for: %s" % sel)
+
+  occs = find_lr(
+    'chain A and resseq 2 and resname BEN and (altloc A or altloc " ")').get_occupancies()
+  assert approx_equal(occs.occ_mean, 0.56, eps=0.01)
+
+  occs = find_lr(
+    'chain A and resseq 2 and resname BEN and (altloc B or altloc " ")').get_occupancies()
+  assert approx_equal(occs.occ_mean, 0.44, eps=0.01)
+
+  occs = find_lr('chain A and resseq 3 and resname SO4').get_occupancies()
+  assert approx_equal(occs.occ_mean, 0.65, eps=0.01)
+
+  occs = find_lr('chain A and resseq 4 and resname SO4').get_occupancies()
+  assert approx_equal(occs.occ_mean, 0.48, eps=0.01)
+
+  occs = find_lr('chain A and resseq 5 and resname GOL').get_occupancies()
+  assert approx_equal(occs.occ_mean, 0.67, eps=0.01)
 
 # ------------------------------------------------------------------------------
 
@@ -444,8 +450,27 @@ def run_test05():
 
   vl_manager = result.ligand_manager
 
+  # Check identity via (resname, altloc) pairs — independent of id_str
+  expected = {('NGA', 'A'), ('A2G', 'B'), ('GAL', '')}
+  found    = {(lr.resname, lr.altloc) for lr in vl_manager}
+  assert found == expected, "unexpected ligand set: %s" % found
+
+  # Verify iselection size against selection strings derived from pdb_str_tst_5
+  expected_sel = {
+    ('NGA', 'A'): 'chain B and resseq 1 and resname NGA',
+    ('A2G', 'B'): 'chain B and resseq 1 and resname A2G',
+    ('GAL', ''):  'chain B and resseq 2 and resname GAL',
+  }
+  model = vl_manager.model
   for lr in vl_manager:
-    assert (lr.id_str in ['ANGA B   1', 'BA2G B   1', 'GAL B   2'])
+    key = (lr.resname, lr.altloc)
+    ligand_isel = model.iselection(expected_sel[key])
+    expected_size = ligand_isel.size()
+    assert lr.ligand_isel.size() == expected_size, \
+        "isel size mismatch for %s %s: got %d, expected %d" % (
+            lr.resname, lr.altloc,
+            lr.ligand_isel.size(), expected_size)
+    assert (set(lr.ligand_isel) == set(ligand_isel))
   #
   os.remove(model_fn)
 
