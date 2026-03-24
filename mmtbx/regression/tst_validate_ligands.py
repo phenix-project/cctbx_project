@@ -129,7 +129,18 @@ def run_test02():
     msg = traceback.format_exc()
     print(msg)
 
+  ligands = ['ABEN A   2',
+             'BBEN A   2',
+             'SO4 A   3',
+             'SO4 A   4',
+             'GOL A   5']
+
   vl_manager = result.ligand_manager
+  for lr in vl_manager:
+    id_str = lr.id_str
+    assert id_str in ligands
+
+
   tst_occupancies(vl_manager = vl_manager)
   tst_adps(vl_manager = vl_manager)
   tst_rmsds(vl_manager = vl_manager)
@@ -137,9 +148,16 @@ def run_test02():
 # ------------------------------------------------------------------------------
 
 def tst_rmsds(vl_manager):
+  ligand_isel = vl_manager.model.iselection('resname SO4 and chain A and resseq 4')
+
   for lr in vl_manager:
-    id_str = lr.id_str
-    if (id_str.strip() == 'SO4 A   4'):
+    #if lr.ligand_isel.size() != ligand_isel.size(): continue
+    #print((lr.ligand_isel == ligand_isel))
+    are_equal = (set(lr.ligand_isel) == set(ligand_isel))
+    if are_equal:
+    #if (lr.ligand_isel == ligand_isel):
+    #id_str = lr.id_str
+    #if (id_str.strip() == 'SO4 A   4'):
       rmsd_result = lr.get_rmsds()
       assert approx_equal(rmsd_result.bond_rmsd, 0.055, eps=0.005)
       assert approx_equal(rmsd_result.bond_rmsz, 2.761, eps=0.005)
@@ -176,40 +194,47 @@ def tst_adps(vl_manager):
   '''
   Test ADPs of ligands and surrounding atoms
   '''
+  n_tested = 0
   for lr in vl_manager:
     occs = lr.get_occupancies()
     id_str = lr.id_str
     adps = lr.get_adps()
-    if (id_str == 'ABEN B   2'):
+    if (id_str == 'ABEN A   2'):
       assert(adps.n_iso == 0)
       assert(adps.n_aniso == 9)
       assert(adps.b_min_within is None)
       assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
         [4.7, 8.1, 6.0], eps=0.1)
-    if (id_str.strip() == 'BBEN B   2'):
+      n_tested+=1
+    if (id_str.strip() == 'BBEN A   2'):
       assert(adps.n_iso == 0)
       assert(adps.n_aniso == 9)
       assert(adps.b_min_within is None)
       assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
         [5.1, 8.2, 6.4], eps=0.1)
-    if (id_str.strip() == 'SO4 B   3'):
+      n_tested+=1
+    if (id_str.strip() == 'SO4 A   3'):
       assert(adps.n_iso == 5)
       assert(adps.n_aniso == 0)
       assert(adps.b_min_within is None)
       assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
         [7.4,13.1,10.2], eps=0.1)
-    if (id_str.strip() == 'SO4 B   4'):
+      n_tested+=1
+    if (id_str.strip() == 'SO4 A   4'):
       assert(adps.n_iso == 0)
       assert(adps.n_aniso == 5)
       assert(adps.b_min_within is None)
       assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
         [10.3,14.6,12.3], eps=0.1)
-    if (id_str.strip() == 'GOL B   5'):
+      n_tested+=1
+    if (id_str.strip() == 'GOL A   5'):
       assert(adps.n_iso == 6)
       assert(adps.n_aniso == 0)
       assert(adps.b_min_within is None)
       assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
         [58.7,114.9,96.9], eps=0.1)
+      n_tested+=1
+  assert n_tested==5
 
 # ------------------------------------------------------------------------------
 
@@ -420,7 +445,7 @@ def run_test05():
   vl_manager = result.ligand_manager
 
   for lr in vl_manager:
-    assert (lr.id_str in ['NGA B   1', 'A2G B   1', 'GAL B   2'])
+    assert (lr.id_str in ['ANGA B   1', 'BA2G B   1', 'GAL B   2'])
   #
   os.remove(model_fn)
 
@@ -519,7 +544,7 @@ def run_test09():
   Writes a 2mFo-DFc model map from 1avd to a temp CCP4 file, then runs
   the program with PDB + map (no MTZ) to exercise the map_manager branch.
   '''
-  print('test10')
+  print('test09')
   from mmtbx import map_tools
   from cctbx import maptbx, miller
   from iotbx import mrcfile

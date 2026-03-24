@@ -491,7 +491,6 @@ class ligand_result(object):
       negative_isel       = (occ<0).iselection(),
       zero_count          = (flex.abs(occ)<eps).count(True),
       zero_isel           = (flex.abs(occ)<eps).iselection(),
-
       )
 
     return self._occupancies
@@ -522,14 +521,12 @@ class ligand_result(object):
     #  _sel_str = self.sel_str
     _sel_str = self.sel_str
 
-    sel_within_str_noH = '(residues_within (%s, %s)) and not water \
+    sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or dna) \
     and not (element H or element D) and not (%s)' % \
     (within_radius, self.sel_str, _sel_str)
 
-    #sel_cache = self._ph.atom_selection_cache()
-    #site_sel= sel_cache.selection(sel_within_str_noH) # does not know residues_within
-    #STOP()
     #print(sel_within_str_noH)
+    #sel_within_bool_sel = self.model.selection(sel_within_str_noH)
     isel_within_noH = self.model.iselection(sel_within_str_noH)
     xrs_within_noH = self._xrs.select(isel_within_noH)
     b_isos_within = xrs_within_noH.extract_u_iso_or_u_equiv() * adptbx.u_as_b(1.)
@@ -594,7 +591,7 @@ class ligand_result(object):
       _id_str = _id_str.split('"')[1]
     #_id_str = _id_str.strip().split(' ')
     #self.id_str = " ".join(_id_str[1:]).strip()
-    self.id_str = _id_str[5:].strip()
+    self.id_str = _id_str[4:].strip()
     #
     _noH = ' and not (element H or element D)'
     self.sel_str_noH = self.sel_str + _noH
