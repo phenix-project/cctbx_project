@@ -475,42 +475,35 @@ def run_test08():
     print('  skipping: phenix_regression not available')
     return
 
+  # Sanity ranges valid for all ligands; fmodel is set so result is never None
   for lr in vl_manager:
-    id_str = lr.id_str.strip()
     map_values = lr.get_map_values()
-
-    # All ligands have fmodel set -> result is never None
     assert map_values is not None
-
-    # fofc_map_values: one entry per non-H atom (atom count from model file)
-    if id_str == 'BTN A 400':
-      assert map_values.fofc_map_values.size() == 16
-    elif id_str == 'BTN B 401':
-      assert map_values.fofc_map_values.size() == 16
-    elif id_str == 'NAG A 600':
-      assert map_values.fofc_map_values.size() == 14
-
-    # Sanity ranges valid for all ligands
     assert map_values.percent_bad_at_atom_centers >= 0
     assert map_values.n_bad_blobs >= 0
     assert map_values.percent_bad_blobs >= 0
     assert map_values.percent_bad_blobs <= 100
 
-    if id_str == 'BTN A 400':
-      # Well-fitted ligand: no atoms or blobs in bad density
-      assert map_values.percent_bad_at_atom_centers == 0.0
-      assert map_values.n_bad_blobs == 0
-      assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
-    elif id_str == 'BTN B 401':
-      # Well-fitted; two small difference-density blobs near the ligand
-      assert map_values.percent_bad_at_atom_centers == 0.0
-      assert map_values.n_bad_blobs == 2
-      assert approx_equal(map_values.percent_bad_blobs, 0.546, eps=0.5)
-    elif id_str == 'NAG A 600':
-      # Moderately fitted; no atoms sitting in bad density
-      assert map_values.percent_bad_at_atom_centers == 0.0
-      assert map_values.n_bad_blobs == 0
-      assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
+  # --- BTN A 400: well-fitted, no bad density ---
+  map_values = find_lr(vl_manager, 'chain A and resseq 400 and resname BTN').get_map_values()
+  assert map_values.fofc_map_values.size() == 16
+  assert map_values.percent_bad_at_atom_centers == 0.0
+  assert map_values.n_bad_blobs == 0
+  assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
+
+  # --- BTN B 401: well-fitted; two small difference-density blobs nearby ---
+  map_values = find_lr(vl_manager, 'chain B and resseq 401 and resname BTN').get_map_values()
+  assert map_values.fofc_map_values.size() == 16
+  assert map_values.percent_bad_at_atom_centers == 0.0
+  assert map_values.n_bad_blobs == 2
+  assert approx_equal(map_values.percent_bad_blobs, 0.546, eps=0.5)
+
+  # --- NAG A 600: moderately fitted, no atoms in bad density ---
+  map_values = find_lr(vl_manager, 'chain A and resseq 600 and resname NAG').get_map_values()
+  assert map_values.fofc_map_values.size() == 14
+  assert map_values.percent_bad_at_atom_centers == 0.0
+  assert map_values.n_bad_blobs == 0
+  assert approx_equal(map_values.percent_bad_blobs, 0.0, eps=0.1)
 
 
 # ------------------------------------------------------------------------------
@@ -581,9 +574,8 @@ def run_test09():
       assert hasattr(ccs, 'rscc')
       assert not hasattr(ccs, 'frag_ccs')
       assert -1 <= ccs.rscc <= 1
-      if lr.id_str.strip() == 'BTN A 400':
-        # Well-fitted ligand: CC with its own model map should be positive
-        assert ccs.rscc > 0.5
+    # Well-fitted ligand: CC with its own model map should be positive
+    assert find_lr(vl_manager2, 'chain A and resseq 400 and resname BTN').get_ccs().rscc > 0.5
   finally:
     if os.path.isfile(map_fn):
       os.remove(map_fn)
