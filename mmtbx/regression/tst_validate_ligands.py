@@ -243,10 +243,8 @@ def tst_adps(vl_manager):
 
 def run_test03():
   '''
-  Test
-  - CC calculation for three ligands
-  - ADP calculations for ligands
-  - occupancy calculations for ligands
+  Test CC, ADP, occupancy, overlap, and geometry metrics for three ligands
+  in streptavidin (1avd): BTN A 400, BTN B 401, NAG A 600.
   '''
   print('test03')
   vl_manager = _load_1avd_manager()
@@ -254,140 +252,98 @@ def run_test03():
     print('  skipping: phenix_regression not available')
     return
 
+  # Universal assertions: hold for every ligand in 1avd
   for lr in vl_manager:
-    id_str = lr.id_str
     occs = lr.get_occupancies()
-    adps = lr.get_adps()
-    ccs = lr.get_ccs()
-    overlaps = lr.get_overlaps()
-    rmsd_result = lr.get_rmsds()
-
-    # get_occupancies(): negative_count and negative_isel
     assert occs.negative_count == 0
     assert occs.negative_isel.size() == 0
+    assert lr.get_adps().n_zero == 0
+    assert lr.get_overlaps().n_clashes_sym == 0
 
-    # get_adps(): n_zero (no atoms with B < 0.01 for any 1avd ligand)
-    assert adps.n_zero == 0
+  # --- NAG A 600 ---
+  lr = find_lr(vl_manager, 'chain A and resseq 600 and resname NAG')
+  occs = lr.get_occupancies()
+  adps = lr.get_adps()
+  ccs = lr.get_ccs()
+  overlaps = lr.get_overlaps()
 
-    # get_overlaps(): n_clashes_sym
-    assert overlaps.n_clashes_sym == 0
+  assert approx_equal(ccs.rscc, 0.87, eps=0.03)
+  assert approx_equal(occs.occ_min, 0, eps=0.01)
+  assert approx_equal(occs.occ_max, 1, eps=0.01)
+  assert approx_equal(occs.occ_mean, 0.86, eps=0.01)
+  assert occs.zero_count >= 1         # occ_min == 0 -> at least one atom has occ 0
+  assert occs.zero_isel.size() == occs.zero_count
+  assert approx_equal(adps.b_min, 27.99, eps=0.01)
+  assert approx_equal(adps.b_max, 90.00, eps=0.01)
+  assert approx_equal(adps.b_mean, 70.71, eps=0.05)
+  assert approx_equal(adps.b_min_within, 5.23, eps=0.01)
+  assert approx_equal(adps.b_max_within, 79.14, eps=0.01)
+  assert approx_equal(adps.b_mean_within, 35.37, eps=0.02)
+  assert overlaps.n_clashes == 1
+  assert overlaps.n_hbonds == 1
+  assert approx_equal(overlaps.clashscore, 9.4, eps=0.5)
 
-    #
-    if (id_str.strip() == 'NAG A 600'):
-      assert approx_equal(ccs.rscc, 0.87, eps=0.03)
-      #
-      assert approx_equal(occs.occ_min, 0, eps=0.01)
-      assert approx_equal(occs.occ_max, 1, eps=0.01)
-      assert approx_equal(occs.occ_mean, 0.86, eps=0.01)
-      # occ_min == 0 -> at least one atom has occ == 0.0
-      assert occs.zero_count >= 1
-      assert occs.zero_isel.size() == occs.zero_count
-      #
-      assert approx_equal(adps.b_min, 27.99, eps=0.01)
-      assert approx_equal(adps.b_max, 90.00, eps=0.01)
-      assert approx_equal(adps.b_mean, 70.71, eps=0.05)
-      #
-      assert approx_equal(adps.b_min_within, 5.23, eps=0.01)
-      assert approx_equal(adps.b_max_within, 79.14, eps=0.01)
-      assert approx_equal(adps.b_mean_within, 35.37, eps=0.02)
-      #
-      assert(overlaps.n_clashes == 1)
-      assert(overlaps.n_hbonds == 1)
-      assert approx_equal(overlaps.clashscore, 9.4, eps=0.5)
-      #
-    if (id_str.strip() == 'BTN A 400'):
-      assert approx_equal(ccs.rscc, 0.94, eps=0.03)
-      assert isinstance(ccs.frag_ccs, dict)
-      assert len(ccs.frag_ccs) == len(lr.ligand_rigid_components_isels)
-      assert len(ccs.frag_ccs) == 3
-      for cc_val in ccs.frag_ccs.values():
-        assert -1 <= cc_val <= 1
-        assert cc_val > 0.85   # all fragments well-fitted in 1avd
-      #
-      assert occs.zero_count == 0
-      assert occs.zero_isel.size() == 0
-      assert approx_equal(occs.occ_mean, 1, eps=0.01)
-      #
-      assert approx_equal(adps.b_min, 4.00, eps=0.01)
-      assert approx_equal(adps.b_max, 90.00, eps=0.01)
-      assert approx_equal(adps.b_mean, 31.19, eps=0.05)
-      #
-      assert approx_equal(adps.b_min_within, 4.00, eps=0.01)
-      assert approx_equal(adps.b_max_within, 54.65, eps=0.01)
-      assert approx_equal(adps.b_mean_within, 23.23, eps=0.02)
-      #
-      assert(overlaps.n_clashes == 4)
-      assert(overlaps.n_hbonds == 2)
-      assert approx_equal(overlaps.clashscore, 13.0, eps=0.5)
+  # --- BTN A 400 ---
+  lr = find_lr(vl_manager, 'chain A and resseq 400 and resname BTN')
+  occs = lr.get_occupancies()
+  adps = lr.get_adps()
+  ccs = lr.get_ccs()
+  overlaps = lr.get_overlaps()
+  rmsd_result = lr.get_rmsds()
 
-      assert rmsd_result.bond_n == 17
-      assert approx_equal(rmsd_result.bond_rmsd, 0.033, eps=0.005)
-      assert approx_equal(rmsd_result.bond_rmsz, 1.639, eps=0.005)
-      assert(rmsd_result.bond_n_outliers == 1)
-      #
-      assert rmsd_result.angle_n == 23
-      assert approx_equal(rmsd_result.angle_rmsd, 4.00, eps=0.05)
-      assert approx_equal(rmsd_result.angle_rmsz, 1.33, eps=0.05)
-      assert(rmsd_result.angle_n_outliers == 1)
-      #
-      assert rmsd_result.dihedral_n == 20
-      assert approx_equal(rmsd_result.dihedral_rmsd, 17.4, eps=0.5)
-      assert approx_equal(rmsd_result.dihedral_rmsz, 0.579, eps=0.1)
-      assert approx_equal(rmsd_result.planarity_rmsd, 0.02, eps=0.05)
-      assert rmsd_result.dihedral_n_outliers == 0
+  assert approx_equal(ccs.rscc, 0.94, eps=0.03)
+  assert isinstance(ccs.frag_ccs, dict)
+  assert len(ccs.frag_ccs) == len(lr.ligand_rigid_components_isels)
+  assert len(ccs.frag_ccs) == 3
+  for cc_val in ccs.frag_ccs.values():
+    assert -1 <= cc_val <= 1
+    assert cc_val > 0.85         # all fragments well-fitted in 1avd
+  assert occs.zero_count == 0
+  assert occs.zero_isel.size() == 0
+  assert approx_equal(occs.occ_mean, 1, eps=0.01)
+  assert approx_equal(adps.b_min, 4.00, eps=0.01)
+  assert approx_equal(adps.b_max, 90.00, eps=0.01)
+  assert approx_equal(adps.b_mean, 31.19, eps=0.05)
+  assert approx_equal(adps.b_min_within, 4.00, eps=0.01)
+  assert approx_equal(adps.b_max_within, 54.65, eps=0.01)
+  assert approx_equal(adps.b_mean_within, 23.23, eps=0.02)
+  assert overlaps.n_clashes == 4
+  assert overlaps.n_hbonds == 2
+  assert approx_equal(overlaps.clashscore, 13.0, eps=0.5)
+  assert rmsd_result.bond_n == 17
+  assert approx_equal(rmsd_result.bond_rmsd, 0.033, eps=0.005)
+  assert approx_equal(rmsd_result.bond_rmsz, 1.639, eps=0.005)
+  assert rmsd_result.bond_n_outliers == 1
+  assert rmsd_result.angle_n == 23
+  assert approx_equal(rmsd_result.angle_rmsd, 4.00, eps=0.05)
+  assert approx_equal(rmsd_result.angle_rmsz, 1.33, eps=0.05)
+  assert rmsd_result.angle_n_outliers == 1
+  assert rmsd_result.dihedral_n == 20
+  assert approx_equal(rmsd_result.dihedral_rmsd, 17.4, eps=0.5)
+  assert approx_equal(rmsd_result.dihedral_rmsz, 0.579, eps=0.1)
+  assert approx_equal(rmsd_result.planarity_rmsd, 0.02, eps=0.05)
+  assert rmsd_result.dihedral_n_outliers == 0
 
-      #
-    if (id_str.strip() == 'BTN B 401'):
-      assert approx_equal(ccs.rscc, 0.95, eps=0.03)
-      #
-      assert occs.zero_count == 0
-      assert occs.zero_isel.size() == 0
-      assert approx_equal(occs.occ_mean, 1, eps=0.01)
-      #
-      assert approx_equal(adps.b_min, 4.00, eps=0.01)
-      assert approx_equal(adps.b_max, 46.67, eps=0.01)
-      assert approx_equal(adps.b_mean, 23.04, eps=0.05)
-      #
-      assert approx_equal(adps.b_min_within, 4.00, eps=0.01)
-      assert approx_equal(adps.b_max_within, 75.42, eps=0.01)
-      assert approx_equal(adps.b_mean_within, 28.20, eps=0.02)
-      #
-      assert(overlaps.n_clashes == 6)
-      assert(overlaps.n_hbonds == 2)
-      assert approx_equal(overlaps.clashscore, 19.3, eps=0.5)
+  # --- BTN B 401 ---
+  lr = find_lr(vl_manager, 'chain B and resseq 401 and resname BTN')
+  occs = lr.get_occupancies()
+  adps = lr.get_adps()
+  ccs = lr.get_ccs()
+  overlaps = lr.get_overlaps()
 
-
-      #print(round(clashes_result.clashscore,1))
-      #print(adps.b_min_within)
-      #print(adps.b_max_within)
-      #print(adps.b_mean_within)
-      #print(occs.occ_min)
-      #print(occs.occ_max)
-      #print(occs.occ_mean)
-      #print(adps.b_min)
-      #print(adps.b_max)
-      #print(adps.b_mean)
-
-#def tst_get_overlaps(vl_manager):
-#  '''
-#  Test nonbonded overlaps
-#  '''
-#  for id_tuple, ligand_dict in vl_manager.items():
-#    for altloc, lr in ligand_dict.items():
-#      clashes_result = lr.get_overlaps()
-#      assert(clashes_result.n_clashes == 5)
-#      assert approx_equal(clashes_result.clashscore, 31.6, eps=1.0)
-# anaconda
-#(['pdb=" HE3 MET A 107 "', 'pdb=" H81 PG5 A 201 "'], 17, 54, 2.0370952358689647, 2.44, '', None),
-#(['pdb=" CE  MET A 107 "', 'pdb=" C8  PG5 A 201 "'], 15, 34, 2.946989989803154, 3.4, '', None),
-#(['pdb=" CE  MET A 107 "', 'pdb=" H83 PG5 A 201 "'], 15, 56, 2.4839921497460486, 2.92, '', None)
-#
-# MAC
-#(['pdb=" CE  MET A 107 "', 'pdb=" C8  PG5 A 201 "'], 16, 35, 2.946989989803154, 3.4, '', None),
-#(['pdb=" HE3 MET A 107 "', 'pdb=" H83 PG5 A 201 "'], 18, 57, 2.026073542594147, 2.44, '', None),
-#(['pdb=" CE  MET A 107 "', 'pdb=" H81 PG5 A 201 "'], 16, 55, 2.4973179613337146, 2.92, '', None)
-#
-# Readyset gives different names to H atoms.
+  assert approx_equal(ccs.rscc, 0.95, eps=0.03)
+  assert occs.zero_count == 0
+  assert occs.zero_isel.size() == 0
+  assert approx_equal(occs.occ_mean, 1, eps=0.01)
+  assert approx_equal(adps.b_min, 4.00, eps=0.01)
+  assert approx_equal(adps.b_max, 46.67, eps=0.01)
+  assert approx_equal(adps.b_mean, 23.04, eps=0.05)
+  assert approx_equal(adps.b_min_within, 4.00, eps=0.01)
+  assert approx_equal(adps.b_max_within, 75.42, eps=0.01)
+  assert approx_equal(adps.b_mean_within, 28.20, eps=0.02)
+  assert overlaps.n_clashes == 6
+  assert overlaps.n_hbonds == 2
+  assert approx_equal(overlaps.clashscore, 19.3, eps=0.5)
 
 # ------------------------------------------------------------------------------
 
@@ -410,21 +366,20 @@ def run_test04():
 
   vl_manager = result.ligand_manager
 
-  for lr in vl_manager:
-    assert (lr.id_str == 'A1AYY A 301')
-    occs = lr.get_occupancies()
-    adps = lr.get_adps()
-    #
-    assert approx_equal(occs.occ_mean, 0.91, eps=0.01)
-    #
-    assert approx_equal(adps.b_min, 38.36, eps=0.01)
-    assert approx_equal(adps.b_max, 66.40, eps=0.01)
-    assert approx_equal(adps.b_mean, 47.82, eps=0.05)
-    #
-    assert approx_equal(adps.b_min_within, 30.55, eps=0.01)
-    assert approx_equal(adps.b_max_within, 63.10, eps=0.01)
-    assert approx_equal(adps.b_mean_within, 42.45, eps=0.02)
-  #
+  assert len(vl_manager) == 1
+  lr = vl_manager[0]
+  assert lr.resname == 'A1AYY'   # 5-character resname preserved
+  assert lr.altloc == ''
+
+  occs = lr.get_occupancies()
+  adps = lr.get_adps()
+  assert approx_equal(occs.occ_mean, 0.91, eps=0.01)
+  assert approx_equal(adps.b_min, 38.36, eps=0.01)
+  assert approx_equal(adps.b_max, 66.40, eps=0.01)
+  assert approx_equal(adps.b_mean, 47.82, eps=0.05)
+  assert approx_equal(adps.b_min_within, 30.55, eps=0.01)
+  assert approx_equal(adps.b_max_within, 63.10, eps=0.01)
+  assert approx_equal(adps.b_mean_within, 42.45, eps=0.02)
   os.remove(model_fn)
 
 # ------------------------------------------------------------------------------
