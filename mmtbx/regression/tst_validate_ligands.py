@@ -146,6 +146,16 @@ def run_test02():
 
 # ------------------------------------------------------------------------------
 
+def find_lr(vl_manager, sel):
+  '''Return the ligand_result whose ligand_isel matches model.iselection(sel).'''
+  ref = set(vl_manager.model.iselection(sel))
+  for lr in vl_manager:
+    if set(lr.ligand_isel) == ref:
+      return lr
+  raise AssertionError("no ligand found for: %s" % sel)
+
+# ------------------------------------------------------------------------------
+
 def tst_rmsds(vl_manager):
   ligand_isel = vl_manager.model.iselection('resname SO4 and chain A and resseq 4')
   for lr in vl_manager:
@@ -168,79 +178,66 @@ def tst_occupancies(vl_manager):
   Test occupancies
   '''
   assert len(vl_manager) == 5
-  model = vl_manager.model
 
-  def find_lr(sel):
-    ref = set(model.iselection(sel))
-    for lr in vl_manager:
-      if set(lr.ligand_isel) == ref:
-        return lr
-    raise AssertionError("no ligand found for: %s" % sel)
-
-  occs = find_lr(
-    'chain A and resseq 2 and resname BEN and (altloc A or altloc " ")').get_occupancies()
+  occs = find_lr(vl_manager,
+    'chain A and resseq 2 and resname BEN and (altloc A)').get_occupancies()
   assert approx_equal(occs.occ_mean, 0.56, eps=0.01)
 
-  occs = find_lr(
-    'chain A and resseq 2 and resname BEN and (altloc B or altloc " ")').get_occupancies()
+  occs = find_lr(vl_manager,
+    'chain A and resseq 2 and resname BEN and (altloc B)').get_occupancies()
   assert approx_equal(occs.occ_mean, 0.44, eps=0.01)
 
-  occs = find_lr('chain A and resseq 3 and resname SO4').get_occupancies()
+  occs = find_lr(vl_manager, 'chain A and resseq 3 and resname SO4').get_occupancies()
   assert approx_equal(occs.occ_mean, 0.65, eps=0.01)
 
-  occs = find_lr('chain A and resseq 4 and resname SO4').get_occupancies()
+  occs = find_lr(vl_manager, 'chain A and resseq 4 and resname SO4').get_occupancies()
   assert approx_equal(occs.occ_mean, 0.48, eps=0.01)
 
-  occs = find_lr('chain A and resseq 5 and resname GOL').get_occupancies()
+  occs = find_lr(vl_manager, 'chain A and resseq 5 and resname GOL').get_occupancies()
   assert approx_equal(occs.occ_mean, 0.67, eps=0.01)
 
 # ------------------------------------------------------------------------------
 
 def tst_adps(vl_manager):
   '''
-  Test ADPs of ligands and surrounding atoms
+  Test ADPs of ligands
   '''
-  n_tested = 0
-  for lr in vl_manager:
-    occs = lr.get_occupancies()
-    id_str = lr.id_str
-    adps = lr.get_adps()
-    if (id_str == 'ABEN A   2'):
-      assert(adps.n_iso == 0)
-      assert(adps.n_aniso == 9)
-      assert(adps.b_min_within is None)
-      assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
-        [4.7, 8.1, 6.0], eps=0.1)
-      n_tested+=1
-    if (id_str.strip() == 'BBEN A   2'):
-      assert(adps.n_iso == 0)
-      assert(adps.n_aniso == 9)
-      assert(adps.b_min_within is None)
-      assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
-        [5.1, 8.2, 6.4], eps=0.1)
-      n_tested+=1
-    if (id_str.strip() == 'SO4 A   3'):
-      assert(adps.n_iso == 5)
-      assert(adps.n_aniso == 0)
-      assert(adps.b_min_within is None)
-      assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
-        [7.4,13.1,10.2], eps=0.1)
-      n_tested+=1
-    if (id_str.strip() == 'SO4 A   4'):
-      assert(adps.n_iso == 0)
-      assert(adps.n_aniso == 5)
-      assert(adps.b_min_within is None)
-      assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
-        [10.3,14.6,12.3], eps=0.1)
-      n_tested+=1
-    if (id_str.strip() == 'GOL A   5'):
-      assert(adps.n_iso == 6)
-      assert(adps.n_aniso == 0)
-      assert(adps.b_min_within is None)
-      assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
-        [58.7,114.9,96.9], eps=0.1)
-      n_tested+=1
-  assert n_tested==5
+  adps = find_lr(vl_manager,
+    'chain A and resseq 2 and resname BEN and (altloc A)').get_adps()
+  assert adps.n_iso == 0
+  assert adps.n_aniso == 9
+  assert adps.b_min_within is None
+  assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
+          [4.7, 8.1, 6.0], eps=0.1)
+
+  adps = find_lr(vl_manager,
+    'chain A and resseq 2 and resname BEN and (altloc B)').get_adps()
+  assert adps.n_iso == 0
+  assert adps.n_aniso == 9
+  assert adps.b_min_within is None
+  assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
+          [5.1, 8.2, 6.4], eps=0.1)
+
+  adps = find_lr(vl_manager, 'chain A and resseq 3 and resname SO4').get_adps()
+  assert adps.n_iso == 5
+  assert adps.n_aniso == 0
+  assert adps.b_min_within is None
+  assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
+          [7.4, 13.1, 10.2], eps=0.1)
+
+  adps = find_lr(vl_manager, 'chain A and resseq 4 and resname SO4').get_adps()
+  assert adps.n_iso == 0
+  assert adps.n_aniso == 5
+  assert adps.b_min_within is None
+  assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
+          [10.3, 14.6, 12.3], eps=0.1)
+
+  adps = find_lr(vl_manager, 'chain A and resseq 5 and resname GOL').get_adps()
+  assert adps.n_iso == 6
+  assert adps.n_aniso == 0
+  assert adps.b_min_within is None
+  assert approx_equal([adps.b_min, adps.b_max, adps.b_mean],
+          [58.7, 114.9, 96.9], eps=0.1)
 
 # ------------------------------------------------------------------------------
 
