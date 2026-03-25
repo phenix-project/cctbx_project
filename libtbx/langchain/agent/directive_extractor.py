@@ -2065,6 +2065,32 @@ def _apply_workflow_intent_fallback(directives, advice_lower):
         directives["workflow_preferences"][
             "use_experimental_phasing"] = True
 
+    # Ligand-fitting implies model is placed.
+    # You can't fit a ligand into an unplaced model.  When the user
+    # says "fit ATP" or "fit ligand", the model must already be in
+    # the correct position — no MR or docking needed.
+    # Guard: only set model_is_placed when the advice does NOT also
+    # mention molecular replacement, phaser, solving, or docking
+    # (those indicate the model still needs placement first).
+    _ligand_fit_signals = [
+        "fit ligand", "fit the ligand", "ligandfit",
+        "fit atp", "fit nad", "fit fad", "fit heme",
+        "place ligand", "place the ligand",
+        "add ligand", "add the ligand",
+        "dock ligand", "dock the ligand",
+    ]
+    _mr_signals = [
+        "molecular replacement", "phaser", "solve",
+        "mr ", "autosol", "predict",
+        "dock in map", "dock_in_map", "dock into",
+    ]
+    if (any(sig in advice_lower for sig in _ligand_fit_signals) and
+            not any(sig in advice_lower for sig in _mr_signals)):
+        if "workflow_preferences" not in directives:
+            directives["workflow_preferences"] = {}
+        directives["workflow_preferences"][
+            "model_is_placed"] = True
+
 
 def extract_directives_simple(user_advice):
     """
