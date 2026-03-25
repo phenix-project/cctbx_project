@@ -1893,6 +1893,33 @@ class WorkflowEngine:
                             "Overrode after_program_done "
                             "(CC=%.3f < 0.70)" % _cc)
 
+                # v115.09b: Post-ligandfit exemption.
+                # "fit ligand and stop" means "complete the
+                # ligand-fitting workflow" — not "halt after
+                # the ligandfit binary."  The combine step
+                # (pdbtools) and a follow-up refinement are
+                # essential: without combining, the user gets
+                # separate protein and ligand files.  Without
+                # re-refinement, the combined model has bad
+                # geometry at the ligand-protein interface.
+                # Guard: only exempt when pdbtools hasn't run
+                # yet (combine_ligand step) or post-ligandfit
+                # refinement is still pending.  Once both
+                # complete, after_program_done fires normally.
+                if (after_program == "phenix.ligandfit"
+                        and context):
+                    if step_name == "combine_ligand":
+                        after_program_done = False
+                        modifications.append(
+                            "Overrode after_program_done "
+                            "(combine_ligand step needed)")
+                    elif context.get(
+                            "needs_post_ligandfit_refine"):
+                        after_program_done = False
+                        modifications.append(
+                            "Overrode after_program_done "
+                            "(post-ligandfit refine needed)")
+
             if after_program_done:
                 # User's workflow is complete — replace the entire valid_programs
                 # list with just STOP.  Simply appending STOP is not enough: the
