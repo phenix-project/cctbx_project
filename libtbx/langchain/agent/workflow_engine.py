@@ -1893,34 +1893,63 @@ class WorkflowEngine:
                             "Overrode after_program_done "
                             "(CC=%.3f < 0.70)" % _cc)
 
-                # v115.09b: Post-ligandfit exemption.
-                # "fit ligand and stop" means "complete the
-                # ligand-fitting workflow" — not "halt after
-                # the ligandfit binary."  The combine step
-                # (pdbtools) and a follow-up refinement are
-                # essential: without combining, the user gets
-                # separate protein and ligand files.  Without
-                # re-refinement, the combined model has bad
-                # geometry at the ligand-protein interface.
-                # Guard: only exempt when pdbtools hasn't run
-                # yet (combine_ligand step) or post-ligandfit
-                # refinement is still pending.  Once both
-                # complete, after_program_done fires normally.
-                if (after_program == "phenix.ligandfit"
-                        and context):
-                    if step_name == "combine_ligand":
-                        after_program_done = False
-                        modifications.append(
-                            "Overrode after_program_done "
-                            "(combine_ligand step needed)")
-                    elif context.get(
-                            "needs_post_ligandfit_refine"):
-                        after_program_done = False
-                        modifications.append(
-                            "Overrode after_program_done "
-                            "(post-ligandfit refine needed)")
+            # v115.09b: Post-ligandfit exemption.
+            # "fit ligand and stop" means "complete the
+            # ligand-fitting workflow" — not "halt after
+            # the ligandfit binary."  The combine step
+            # (pdbtools) and a follow-up refinement are
+            # essential: without combining, the user gets
+            # separate protein and ligand files.  Without
+            # re-refinement, the combined model has bad
+            # geometry at the ligand-protein interface.
+            # Guard: only exempt when pdbtools hasn't run
+            # yet (combine_ligand step) or post-ligandfit
+            # refinement is still pending.  Once both
+            # complete, after_program_done fires normally.
+            #
+            # NOTE: We use _post_ligandfit_pending instead
+            # of setting after_program_done=False, because
+            # the else branch would re-add ligandfit to
+            # valid_programs (confusing the LLM into
+            # picking validation over refinement).
+            _post_ligandfit_pending = False
+            if (after_program_done
+                    and after_program == "phenix.ligandfit"
+                    and context):
+                if step_name == "combine_ligand":
+                    _post_ligandfit_pending = True
+                    modifications.append(
+                        "Post-ligandfit: combine_ligand "
+                        "step needed — keeping "
+                        "valid_programs as-is")
+                elif context.get(
+                        "needs_post_ligandfit_refine"):
+                    _post_ligandfit_pending = True
+                    modifications.append(
+                        "Post-ligandfit: refine needed "
+                        "— keeping valid_programs as-is")
 
-            if after_program_done:
+            if _post_ligandfit_pending:
+                # Don't STOP and don't re-add ligandfit.
+                # Let the step's valid_programs pass through
+                # but prioritize refinement programs so the
+                # LLM doesn't skip refine in favor of
+                # validation (molprobity).
+                _refine_progs = [
+                    "phenix.refine", "phenix.real_space_refine"]
+                for rp in reversed(_refine_progs):
+                    if rp in result:
+                        result.remove(rp)
+                        result.insert(0, rp)
+                # Also ensure pdbtools is available for
+                # the combine_ligand step.
+                if (step_name == "combine_ligand"
+                        and "phenix.pdbtools" not in result):
+                    result.insert(0, "phenix.pdbtools")
+                    modifications.append(
+                        "Added phenix.pdbtools "
+                        "(combine_ligand step)")
+            elif after_program_done:
                 # User's workflow is complete — replace the entire valid_programs
                 # list with just STOP.  Simply appending STOP is not enough: the
                 # step detector may have already added programs like
