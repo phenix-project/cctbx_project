@@ -21,8 +21,12 @@ def run():
 
 def run_test01():
   '''
-  Several tests:
-    - check sites: some dna involes symmetry, don't count HOH or EDO
+  Several tests for AQS (intercalator) in a DNA fragment (386D):
+    - occupancy and ADP metrics for AQS
+    - overlap metrics for AQS
+    - DT is excluded because it is further than 3 A (even sym copies)
+    - sites: some dna residues invole symmetry
+    - sites: don't count HOH or EDO or sym copy of the ligand itself
   '''
   print('test01')
   model_fn = "tst_01_fragment.pdb"
@@ -38,24 +42,56 @@ def run_test01():
 
   assert len(vl_manager) == 2
 
-  lr = find_lr(vl_manager, 'resname AQS')
+  # --- AQS A 7 ---
+  lr = find_lr(vl_manager, 'chain A and resseq 7 and resname AQS')
+
+  # get_occupancies(): all AQS atoms have occ=1.00
+  occs = lr.get_occupancies()
+  assert approx_equal(occs.occ_mean, 1.0, eps=0.01)
+  assert occs.zero_count == 0
+  assert occs.negative_count == 0
+
+  # get_adps(): all AQS atoms have isotropic B factors
   adps = lr.get_adps()
+  assert adps.n_aniso == 0
+  assert adps.n_iso > 0
   assert approx_equal(adps.b_min, 13.12, eps=0.01)
   assert approx_equal(adps.b_max, 40.19, eps=0.01)
   assert approx_equal(adps.b_mean, 19.18, eps=0.05)
+  assert adps.isel_within_noH.size() > 0
   assert approx_equal(adps.b_min_within, 6.90, eps=0.01)
   assert approx_equal(adps.b_max_within, 38.24, eps=0.01)
   assert approx_equal(adps.b_mean_within, 18.60, eps=0.02)
 
-
+  # isel_within_noH: verify neighboring sites composition
   sites_model = lr.model.select(adps.isel_within_noH)
   sites_hierarchy = sites_model.get_hierarchy()
   resnames_in_sites = []
   for rg in sites_hierarchy.residue_groups():
     resnames_in_sites.extend(rg.unique_resnames())
   resnames_in_sites = [resname.strip() for resname in resnames_in_sites]
+  # DT is further than 3A from AQS -> correctly excluded
   assert 'DT' not in resnames_in_sites
+  # HOH and other ligands are excluded
   assert 'EDO' not in resnames_in_sites
+  assert 'HOH' not in resnames_in_sites
+  # Exact DNA neighbor set: DA, DC, DG are within 3.0 A of AQS; DT is not
+  assert set(resnames_in_sites) == {'DA', 'DC', 'DG'}
+
+  overlaps = lr.get_overlaps()
+  assert overlaps is not None
+  assert overlaps.n_clashes == 7
+  assert overlaps.n_hbonds == 1
+  assert approx_equal(overlaps.clashscore, 116.7, eps=0.5)
+
+  # --- EDO A 43 ---
+  lr_edo = find_lr(vl_manager, 'chain A and resseq 43 and resname EDO')
+  assert lr_edo.resname == 'EDO'
+  assert lr_edo.altloc == ''
+  occs_edo = lr_edo.get_occupancies()
+  assert approx_equal(occs_edo.occ_mean, 1.0, eps=0.01)
+  assert occs_edo.zero_count == 0
+  assert occs_edo.negative_count == 0
 
 # ------------------------------------------------------------------------------
 
@@ -339,7 +375,6 @@ HETATM  272  O   HOH A  44      13.141   7.938  24.804  1.00 30.00           O
 HETATM  273  O   HOH A  45      14.315   9.704  25.675  1.00 30.00           O
 END
 '''
-
 
 # ------------------------------------------------------------------------------
 

@@ -521,7 +521,7 @@ class ligand_result(object):
     #  _sel_str = self.sel_str
     _sel_str = self.sel_str
 
-    sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or dna) \
+    sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or rna) \
     and not (element H or element D) and not (%s)' % \
     (within_radius, self.sel_str, _sel_str)
 
