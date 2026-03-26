@@ -1597,19 +1597,26 @@ class WorkflowEngine:
             print("  [DIAG] after _apply_directives: %s" % valid)
 
         # v115.09b: combine_ligand step guard.
-        # After ligandfit, the combine_ligand step MUST have
-        # pdbtools available.  _apply_directives may remove it
-        # (e.g. after_program=ligandfit → STOP wipe).  This
-        # belt-and-suspenders guard re-adds pdbtools regardless
-        # of what _apply_directives did.
-        if (step_name == "combine_ligand"
-                and "phenix.pdbtools" not in valid):
-            valid.insert(0, "phenix.pdbtools")
-            if "STOP" in valid:
-                valid.remove("STOP")
-            if _diag:
-                print("  [DIAG] combine_ligand guard: "
-                      "restored pdbtools, result=%s" % valid)
+        # After ligandfit, the combine_ligand step MUST run
+        # pdbtools and ONLY pdbtools.  _apply_directives may
+        # inject other programs (after_program, program_settings)
+        # that the LLM picks instead of pdbtools.  Force the
+        # list to just pdbtools.
+        if step_name == "combine_ligand":
+            if "phenix.pdbtools" in valid:
+                if valid != ["phenix.pdbtools"]:
+                    valid[:] = ["phenix.pdbtools"]
+                    if _diag:
+                        print("  [DIAG] combine_ligand guard: "
+                              "forced pdbtools-only")
+            else:
+                valid.insert(0, "phenix.pdbtools")
+                if "STOP" in valid:
+                    valid.remove("STOP")
+                if _diag:
+                    print("  [DIAG] combine_ligand guard: "
+                          "restored pdbtools, result=%s"
+                          % valid)
 
         # Add STOP if validation done and at target
         if step_name == "validate" and context.get("validation_done"):
@@ -1948,25 +1955,27 @@ class WorkflowEngine:
                         "— keeping valid_programs as-is")
 
             if _post_ligandfit_pending:
-                # Don't STOP and don't re-add ligandfit.
-                # Let the step's valid_programs pass through
-                # but prioritize refinement programs so the
-                # LLM doesn't skip refine in favor of
-                # validation (molprobity).
-                _refine_progs = [
-                    "phenix.refine", "phenix.real_space_refine"]
-                for rp in reversed(_refine_progs):
-                    if rp in result:
-                        result.remove(rp)
-                        result.insert(0, rp)
-                # Also ensure pdbtools is available for
-                # the combine_ligand step.
-                if (step_name == "combine_ligand"
-                        and "phenix.pdbtools" not in result):
-                    result.insert(0, "phenix.pdbtools")
-                    modifications.append(
-                        "Added phenix.pdbtools "
-                        "(combine_ligand step)")
+                # Don't STOP and don't re-add the after_program.
+                # Behavior depends on the step:
+                if step_name == "combine_ligand":
+                    # Combine step: ONLY pdbtools belongs.
+                    # _apply_directives may have injected
+                    # other programs (refine from
+                    # program_settings, polder from
+                    # after_program).  Strip everything
+                    # except pdbtools.
+                    result[:] = ["phenix.pdbtools"]
+                else:
+                    # Refine step: prioritize refine over
+                    # validation so the LLM doesn't skip
+                    # the post-ligandfit refinement.
+                    _refine_progs = [
+                        "phenix.refine",
+                        "phenix.real_space_refine"]
+                    for rp in reversed(_refine_progs):
+                        if rp in result:
+                            result.remove(rp)
+                            result.insert(0, rp)
             elif after_program_done:
                 # User's workflow is complete — replace the entire valid_programs
                 # list with just STOP.  Simply appending STOP is not enough: the

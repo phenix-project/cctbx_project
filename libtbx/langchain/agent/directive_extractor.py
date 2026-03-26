@@ -2072,6 +2072,14 @@ def _apply_workflow_intent_fallback(directives, advice_lower):
     # Guard: only set model_is_placed when the advice does NOT also
     # mention molecular replacement, phaser, solving, or docking
     # (those indicate the model still needs placement first).
+    #
+    # v115.09b: Also clear after_program.  Ligand-fitting is a
+    # multi-step workflow (refine → ligandfit → pdbtools → refine
+    # → polder → validate).  The plan template covers all steps.
+    # The LLM sets after_program to a DIFFERENT program each run
+    # (ligandfit, refine, or polder), and each choice breaks a
+    # different step.  Clearing after_program lets the plan gates
+    # advance through all stages naturally and stop when complete.
     _ligand_fit_signals = [
         "fit ligand", "fit the ligand", "ligandfit",
         "fit atp", "fit nad", "fit fad", "fit heme",
@@ -2090,6 +2098,16 @@ def _apply_workflow_intent_fallback(directives, advice_lower):
             directives["workflow_preferences"] = {}
         directives["workflow_preferences"][
             "model_is_placed"] = True
+        # Clear after_program — the plan template handles
+        # the full ligand-fitting workflow.  Any single
+        # after_program will interfere with one of the
+        # intermediate steps (combine, post-refine, polder).
+        _sc = directives.get("stop_conditions", {})
+        if _sc.get("after_program"):
+            _sc.pop("after_program", None)
+            _sc.pop("skip_validation", None)
+            if directives.get("intent") == "task":
+                directives["intent"] = "solve"
 
 
 def extract_directives_simple(user_advice):
