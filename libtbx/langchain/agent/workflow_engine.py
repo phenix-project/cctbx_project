@@ -1596,6 +1596,21 @@ class WorkflowEngine:
         if _diag:
             print("  [DIAG] after _apply_directives: %s" % valid)
 
+        # v115.09b: combine_ligand step guard.
+        # After ligandfit, the combine_ligand step MUST have
+        # pdbtools available.  _apply_directives may remove it
+        # (e.g. after_program=ligandfit → STOP wipe).  This
+        # belt-and-suspenders guard re-adds pdbtools regardless
+        # of what _apply_directives did.
+        if (step_name == "combine_ligand"
+                and "phenix.pdbtools" not in valid):
+            valid.insert(0, "phenix.pdbtools")
+            if "STOP" in valid:
+                valid.remove("STOP")
+            if _diag:
+                print("  [DIAG] combine_ligand guard: "
+                      "restored pdbtools, result=%s" % valid)
+
         # Add STOP if validation done and at target
         if step_name == "validate" and context.get("validation_done"):
             if "STOP" not in valid:
@@ -1763,6 +1778,15 @@ class WorkflowEngine:
         result = list(valid_programs)
         modifications = []  # Track what we changed for logging
 
+        # v115.09b: Debug trace for combine_ligand routing
+        _trace_combine = (step_name == "combine_ligand")
+        if _trace_combine:
+            print("  [DIAG] _apply_directives ENTRY: "
+                  "step=%s result=%s" % (step_name, result))
+            print("  [DIAG] _apply_directives: "
+                  "stop_conditions=%s" %
+                  directives.get("stop_conditions", {}))
+
         # Get stop_conditions
         stop_cond = directives.get("stop_conditions", {})
 
@@ -1894,28 +1918,22 @@ class WorkflowEngine:
                             "(CC=%.3f < 0.70)" % _cc)
 
             # v115.09b: Post-ligandfit exemption.
-            # "fit ligand and stop" means "complete the
-            # ligand-fitting workflow" — not "halt after
-            # the ligandfit binary."  The combine step
-            # (pdbtools) and a follow-up refinement are
-            # essential: without combining, the user gets
-            # separate protein and ligand files.  Without
-            # re-refinement, the combined model has bad
-            # geometry at the ligand-protein interface.
-            # Guard: only exempt when pdbtools hasn't run
-            # yet (combine_ligand step) or post-ligandfit
-            # refinement is still pending.  Once both
-            # complete, after_program_done fires normally.
+            # When the ligand-fitting workflow has mandatory
+            # pending steps (combine with pdbtools, then
+            # re-refine the complex), don't let ANY
+            # after_program_done fire.  The LLM may set
+            # after_program to "phenix.ligandfit" OR
+            # "phenix.refine" — either way, the refine that
+            # already ran was pre-ligandfit and doesn't
+            # satisfy the user's intent of refining the
+            # model-with-ligand complex.
             #
             # NOTE: We use _post_ligandfit_pending instead
             # of setting after_program_done=False, because
-            # the else branch would re-add ligandfit to
-            # valid_programs (confusing the LLM into
-            # picking validation over refinement).
+            # the else branch would re-add the after_program
+            # to valid_programs (confusing the LLM).
             _post_ligandfit_pending = False
-            if (after_program_done
-                    and after_program == "phenix.ligandfit"
-                    and context):
+            if after_program_done and context:
                 if step_name == "combine_ligand":
                     _post_ligandfit_pending = True
                     modifications.append(
@@ -1981,6 +1999,17 @@ class WorkflowEngine:
 
         # 3. Apply workflow preferences
         workflow_prefs = directives.get("workflow_preferences", {})
+
+        if _trace_combine:
+            print("  [DIAG] _apply_directives after "
+                  "after_program block: result=%s" % result)
+            print("  [DIAG]   after_program=%s "
+                  "after_program_done=%s "
+                  "_post_ligandfit_pending=%s" % (
+                    after_program,
+                    after_program_done if after_program else 'N/A',
+                    _post_ligandfit_pending
+                      if after_program else 'N/A'))
 
         # Handle use_mr_sad - phaser first, then autosol (handled by experimental_phasing phase)
         # In obtain_model phase: prioritize phaser (need to place model first)
@@ -2121,6 +2150,11 @@ class WorkflowEngine:
             logger.debug(
                 "Directive modification: %s", mod)
         self._last_directive_modifications = modifications
+
+        if _trace_combine:
+            print("  [DIAG] _apply_directives EXIT: "
+                  "result=%s modifications=%s"
+                  % (result, modifications))
 
         return result
 
