@@ -1559,6 +1559,7 @@ phenix.pdbtools:
         extensions: [.pdb]
         flag: ""
         prefer_patterns: [ligand_fit, lig]
+        exclude_patterns: [pose]
 
   # Input priorities for category-based file selection
   input_priorities:
