@@ -268,6 +268,7 @@ def run_test03():
   overlaps = lr.get_overlaps()
 
   assert approx_equal(ccs.rscc, 0.87, eps=0.03)
+  assert approx_equal(ccs.rscc_sites, 0.886, eps=0.03)
   assert approx_equal(occs.occ_min, 0, eps=0.01)
   assert approx_equal(occs.occ_max, 1, eps=0.01)
   assert approx_equal(occs.occ_mean, 0.86, eps=0.01)
@@ -292,6 +293,7 @@ def run_test03():
   rmsd_result = lr.get_rmsds()
 
   assert approx_equal(ccs.rscc, 0.94, eps=0.03)
+  assert approx_equal(ccs.rscc_sites, 0.885, eps=0.03)
   assert isinstance(ccs.frag_ccs, dict)
   assert len(ccs.frag_ccs) == len(lr.ligand_rigid_components_isels)
   assert len(ccs.frag_ccs) == 3
@@ -332,6 +334,7 @@ def run_test03():
   overlaps = lr.get_overlaps()
 
   assert approx_equal(ccs.rscc, 0.95, eps=0.03)
+  assert approx_equal(ccs.rscc_sites, 0.867, eps=0.03)
   assert occs.zero_count == 0
   assert occs.zero_isel.size() == 0
   assert approx_equal(occs.occ_mean, 1, eps=0.01)
@@ -570,10 +573,9 @@ def run_test09():
     for lr in vl_manager2:
       ccs = lr.get_ccs()
       assert ccs is not None
-      # get_ccs_map() returns group_args(rscc=cc) with no frag_ccs
       assert hasattr(ccs, 'rscc')
-      assert not hasattr(ccs, 'frag_ccs')
       assert -1 <= ccs.rscc <= 1
+      assert ccs.rscc_sites is None   # map path never computes sites RSCC
     # Well-fitted ligand: CC with its own model map should be positive
     assert find_lr(vl_manager2, 'chain A and resseq 400 and resname BTN').get_ccs().rscc > 0.5
   finally:

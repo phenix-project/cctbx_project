@@ -166,7 +166,6 @@ class manager(list):
       {'headers': ['', '', 'ligand'], 'width': 16,
        'data_fn': lambda lr: f"{lr.id_str} {lr.altloc}"},
 
-      # CC column is now split into two separate columns
       {'headers': ['', 'RSCC', 'overall'], 'width': 9,
        'data_fn': lambda lr: f"{lr.get_ccs().rscc:.2f}" if lr.get_ccs() else 'NA'},
       {'headers': ['', 'RSCC', 'fragments'], 'width': 40,
@@ -178,7 +177,6 @@ class manager(list):
       {'headers': ['% bad', 'map values', 'Fo-Fc'], 'width': 12,
        'data_fn': lambda lr: f"{lr.get_map_values().percent_bad_at_atom_centers}" if lr.get_map_values() else 'NA'},
 
-      # New columns for bad blobs
       {'headers': ['', 'bad', 'blobs #'], 'width': 9,
        'data_fn': lambda lr: f"{lr.get_map_values().n_bad_blobs}" if lr.get_map_values() else 'NA'},
       {'headers': ['', 'bad blobs', '% grid'], 'width': 11,
@@ -224,12 +222,16 @@ class manager(list):
       adps = lr.get_adps()
       if adps and adps.b_min_within is not None:
         sites_b_str = f"{adps.b_min_within:^7.1f}{adps.b_max_within:^7.1f}{adps.b_mean_within:^7.1f}"
-
+      ccs = lr.get_ccs()
+      if ccs and ccs.rscc_sites is not None:
+        sites_cc_str = f"{lr.get_ccs().rscc_sites:.2f}"
         # Build the sites row cell by cell to guarantee alignment
         sites_row_cells = []
         for i, col in enumerate(columns):
           if i == 0:
             sites_row_cells.append(f"{'sites':^{col['width']}}")
+          elif i == 1: # The RSCC column
+            sites_row_cells.append(f"{sites_cc_str:^{col['width']}}")
           elif i == 8: # The ADPs column
             sites_row_cells.append(f"{sites_b_str:^{col['width']}}")
           else:
@@ -360,6 +362,8 @@ class ligand_result(object):
       #'_qmr'           : 'get_qmr',
       #'_polder_ccs'  : 'get_polder_ccs',
     }
+
+    self.within_radius = 3.0
 
     self._set_internals()
     self.d_min = None
@@ -511,16 +515,7 @@ class ligand_result(object):
     #isel_above_100 = (b_isos > 100).iselection()
     b_min, b_max, b_mean = b_isos.min_max_mean().as_tuple()
 
-    within_radius = 3.0 # TODO should this be a parameter?
-    _sel_str = self.sel_str
-
-    sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or rna) \
-    and not (element H or element D) and not (%s)' % \
-    (within_radius, self.sel_str, _sel_str)
-
-    #sel_within_bool_sel = self.model.selection(sel_within_str_noH)
-    isel_within_noH = self.model.iselection(sel_within_str_noH)
-    xrs_within_noH = self._xrs.select(isel_within_noH)
+    xrs_within_noH = self._xrs.select(self.isel_within_noH)
     b_isos_within = xrs_within_noH.extract_u_iso_or_u_equiv() * adptbx.u_as_b(1.)
     b_min_within, b_max_within, b_mean_within = b_isos_within.min_max_mean().as_tuple()
 
@@ -534,7 +529,7 @@ class ligand_result(object):
       b_min_within    = b_min_within,
       b_max_within    = b_max_within,
       b_mean_within   = b_mean_within,
-      isel_within_noH = isel_within_noH
+      isel_within_noH = self.isel_within_noH
       )
 
     return self._adps
@@ -597,6 +592,12 @@ class ligand_result(object):
     new_s = re.sub(r"\band\b", "", self.sel_str)
     self.fn_string = re.sub(r"\s+", "_", new_s.strip())  # strip + collapse spaces
 
+    # ------ sites ------
+    sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or rna) \
+    and not (element H or element D) and not (%s)' % \
+    (self.within_radius, self.sel_str, self.sel_str)
+    #sel_within_bool_sel = self.model.selection(sel_within_str_noH)
+    self.isel_within_noH = self.model.iselection(sel_within_str_noH)
 
   # ----------------------------------------------------------------------------
 
@@ -814,6 +815,8 @@ class ligand_result(object):
 
     ccs = group_args(
           rscc = cc,
+          rscc_sites = None,
+          frag_ccs = None
        )
 
     return ccs
@@ -821,10 +824,6 @@ class ligand_result(object):
   # ----------------------------------------------------------------------------
 
   def get_ccs_miller(self):
-    #if self.fmodel is None:
-    #  return
-    #if self._ccs is not None:
-    #  return self._ccs
 
     cs = self.fmodel.f_obs().crystal_symmetry()
     crystal_gridding = maptbx.crystal_gridding(
@@ -840,7 +839,7 @@ class ligand_result(object):
     #  space_group_info=cs.space_group_info())
     # 0.6 comes from bulk solvent mask https://journals.iucr.org/a/issues/2024/02/00/pl5035/index.html
 
-    # Dfmodel map including ligand
+    # ----- Dfmodel map including ligand -----
     #fmodel.update_xray_structure(
     #  xray_structure = self.model.get_xray_structure(),
     #  update_f_calc=True
@@ -851,9 +850,9 @@ class ligand_result(object):
       crystal_gridding = crystal_gridding,
       map_type         = "DFmodel")
 
+     # ----- 2mFo-DFc map without ligand -----
     fmodel = self.fmodel.deep_copy()
     bool_sel = self.model.selection(string=self.sel_str)
-    # 2mFo-DFc map without ligand
     fmodel.update_xray_structure(
       xray_structure = fmodel.xray_structure.select(~bool_sel),
       update_f_calc=True
@@ -869,14 +868,42 @@ class ligand_result(object):
 
     cc_total = self.compute_cc(m1, m2, cs, sites_cart)
 
+    # ----- RSCC per ligand fragment -----
     frag_ccs = {}
     for isel in self.ligand_rigid_components_isels:
       sites_cart = sc.select(isel)
       cc = self.compute_cc(m1, m2, cs, sites_cart)
       frag_ccs[isel] = cc
 
+    # ----- RSCC for sites -----
+
+    # 2mFo-DFc map without atoms in sites
+    fmodel_sites = self.fmodel.deep_copy()
+    sites_sel_str_with_H = '(residues_within (%s, %s)) and (protein or dna or rna) \
+    and not (%s)' % (self.within_radius, self.sel_str, self.sel_str)
+    bool_sel_sites = self.model.selection(string=sites_sel_str_with_H)
+
+    if (bool_sel_sites).count(True) != 0:
+      fmodel_sites.update_xray_structure(
+        xray_structure = fmodel_sites.xray_structure.select(~bool_sel_sites),
+        update_f_calc=True
+      )
+      #fmodel.show_short(show_k_mask=True, log=None, prefix="")
+      m1_sites = self.compute_maps(
+        fmodel           = fmodel_sites,
+        crystal_gridding = crystal_gridding,
+        map_type         = "2mFo-DFc")
+
+      sites_cart_sites = sc.select(self.isel_within_noH)
+      cc_total_sites = self.compute_cc(m1_sites, m2, cs, sites_cart_sites)
+    else:
+      cc_total_sites = None
+
+
+    # ----- save -----
     ccs = group_args(
           rscc = cc_total,
+          rscc_sites = cc_total_sites,
           frag_ccs = frag_ccs
        )
 
@@ -968,9 +995,6 @@ class ligand_result(object):
     _m.reshape(m_fofc.accessor())
     _m1 = m_fofc.set_selected(_m!=999999, 0)
 
-    #print('len sel', len(list(sel)))
-    #print(_m1.size())
-
 #    mrcfile.write_ccp4_map(
 #      file_name   = "%s.ccp4" % self.fn_string,
 #      unit_cell   = cs.unit_cell(),
@@ -1018,10 +1042,8 @@ class ligand_result(object):
 
     within_radius = 3.0
 
-    # TODO clashes with other ligands?
     sel_within_str = '%s or (residues_within (%s, %s))' \
       % (self.sel_str, within_radius, self.sel_str)
-    #print(sel_within_str)
 
     sel_within = self.model.selection(sel_within_str)
     #print(sel_within.count(True))
