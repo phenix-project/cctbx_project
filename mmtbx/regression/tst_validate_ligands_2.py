@@ -80,9 +80,9 @@ def run_test01():
 
   overlaps = lr.get_overlaps()
   assert overlaps is not None
-  assert overlaps.n_clashes == 7
-  assert overlaps.n_hbonds == 1
-  assert approx_equal(overlaps.clashscore, 116.7, eps=0.5)
+  assert overlaps.n_clashes == 9
+  assert overlaps.n_hbonds == 3
+  assert approx_equal(overlaps.clashscore, 40.0, eps=0.5)
 
   # --- EDO A 43 ---
   lr_edo = find_lr(vl_manager, 'chain A and resseq 43 and resname EDO')

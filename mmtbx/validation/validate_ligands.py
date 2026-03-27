@@ -295,14 +295,14 @@ class manager(list):
   #         cc_two_fofc, cc_fofc, fofc_min, fofc_max, fofc_mean, file = self.log)
 
 
-  # def show_nonbonded_overlaps(self):
-  #   '''
-  #   Print results for overlaps
-  #   '''
-  #   for id_tuple, ligand_dict in self.items():
-  #     for altloc, lr in ligand_dict.items():
-  #       clashes_result = lr.get_overlaps()
-  #       print(clashes_result.clashes_str, file=self.log)
+#   def show_nonbonded_overlaps(self):
+#     '''
+#     Print results for overlaps
+#     '''
+#     for id_tuple, ligand_dict in self.items():
+#       for altloc, lr in ligand_dict.items():
+#         clashes_result = lr.get_overlaps()
+#         print(clashes_result.clashes_str, file=self.log)
 
   def show_sites_within(self):
     make_sub_header(' Sites within 3 A', out=self.log)
@@ -511,21 +511,13 @@ class ligand_result(object):
     #isel_above_100 = (b_isos > 100).iselection()
     b_min, b_max, b_mean = b_isos.min_max_mean().as_tuple()
 
-    within_radius = 3.0 #TODO should this be a parameter?
-    # if ligand has alternative conformation, ignore it
-    #if 'altloc' in self.sel_str:
-    #  import re
-    #  s = re.sub(r'altloc \w\s*(and\s*)?', '', self.sel_str)
-    #  _sel_str = s.strip()
-    #else:
-    #  _sel_str = self.sel_str
+    within_radius = 3.0 # TODO should this be a parameter?
     _sel_str = self.sel_str
 
     sel_within_str_noH = '(residues_within (%s, %s)) and (protein or dna or rna) \
     and not (element H or element D) and not (%s)' % \
     (within_radius, self.sel_str, _sel_str)
 
-    #print(sel_within_str_noH)
     #sel_within_bool_sel = self.model.selection(sel_within_str_noH)
     isel_within_noH = self.model.iselection(sel_within_str_noH)
     xrs_within_noH = self._xrs.select(isel_within_noH)
@@ -1027,7 +1019,7 @@ class ligand_result(object):
     within_radius = 3.0
 
     # TODO clashes with other ligands?
-    sel_within_str = '%s or (residues_within (%s, %s)) and (protein or water)' \
+    sel_within_str = '%s or (residues_within (%s, %s))' \
       % (self.sel_str, within_radius, self.sel_str)
     #print(sel_within_str)
 
@@ -1079,8 +1071,11 @@ class ligand_result(object):
 
     results_hbonds = ligand_hbonds.get_results()
 
-    #clashes.show(log=sys.stdout)
-    #hbonds.show(log=sys.stdout)
+#    clashes.show(log=sys.stdout)
+#    ligand_clashes.show(log=sys.stdout)
+#
+#    hbonds.show(log=sys.stdout)
+#    ligand_hbonds.show(log=sys.stdout)
 
     #string_io = StringIO()
     #ligand_clashes.show(log=string_io, show_clashscore=False)
