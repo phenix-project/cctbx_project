@@ -11,21 +11,29 @@ ext = bp.import_ext("cctbx_maptbx_bcr_bcr_ext")
 
 class compute(object):
 
-  def __init__(self, xray_structure, n_real, resolution=None, resolutions=None,
+  def __init__(self, xray_structure, n_real, bcr_scatterers=None,
+            resolution=None, resolutions=None,
             use_exp_table=True, debug=False, RadFact=2.0, RadAdd=0.5,
-            show_BCR=False, timing=False):
+            show_BCR=False, timing=False, refinement=False):
 
     start_init = time.perf_counter()
 
-    import cctbx.maptbx.bcr
-    self.bcr_scatterers = cctbx.maptbx.bcr.scatterers(
-      xray_structure = xray_structure,
-      resolution  = resolution,
-      resolutions = resolutions,
-      RadFact     = RadFact,
-      RadAdd      = RadAdd)
+    self.n_real = n_real
+    self.use_exp_table = use_exp_table
+    self.crystal_symmetry = xray_structure.crystal_symmetry()
+    self.xray_structure = xray_structure
 
-    unit_cell = xray_structure.unit_cell()
+    self.bcr_scatterers = bcr_scatterers
+    if self.bcr_scatterers is None:
+      import cctbx.maptbx.bcr
+      self.bcr_scatterers = cctbx.maptbx.bcr.scatterers(
+        xray_structure = xray_structure,
+        resolution     = resolution,
+        resolutions    = resolutions,
+        RadFact        = RadFact,
+        RadAdd         = RadAdd)
+
+    self.unit_cell = xray_structure.unit_cell()
     if resolutions is None:
       resolutions = [resolution,] * xray_structure.scatterers().size()
 
@@ -34,30 +42,33 @@ class compute(object):
     self.OmegaMap_py=None
     if debug:
       self.OmegaMap_py = CalcOmegaMap(Ncrs=n_real, Scrs=[0,0,0], Nxyz=n_real,
-        unit_cell=unit_cell, bcr_scatterers=self.bcr_scatterers)
+        unit_cell=self.crystal_symmetry.unit_cell(),
+        bcr_scatterers=self.bcr_scatterers)
     #
     start = time.perf_counter()
     self.ext_vrm = ext.vrm(
-      Ncrs           = n_real,
+      Ncrs           = self.n_real,
       Scrs           = [0,0,0],
-      Nxyz           = n_real,
-      unit_cell      = unit_cell,
+      Nxyz           = self.n_real,
+      unit_cell      = self.unit_cell,
       bcr_scatterers = self.bcr_scatterers,
-      use_exp_table  = use_exp_table)
+      use_exp_table  = self.use_exp_table)
     OmegaMap_cpp = self.ext_vrm.compute(compute_gradients=False)
     self.time_vrm = time.perf_counter()-start
 
-    OmegaMap_cpp_2 = self.ext_vrm.map  # alternative way to get the map
-    # Re-order
-    nx,ny,nz = n_real
-    mpy  = flex.double(flex.grid(n_real))
-    self.mcpp = flex.double(flex.grid(n_real))
-    for iz in range(0, nz):
-      for iy in range(0, ny):
-        for ix in range(0, nx):
-          if debug:
-            mpy[ix,iy,iz] = self.OmegaMap_py[iz][iy][ix]
-          self.mcpp[ix,iy,iz] = OmegaMap_cpp[iz,iy,ix]
+    self.mcpp=None
+    if not refinement:
+      OmegaMap_cpp_2 = self.ext_vrm.map  # alternative way to get the map
+      # Re-order
+      nx,ny,nz = n_real
+      mpy  = flex.double(flex.grid(n_real))
+      self.mcpp = flex.double(flex.grid(n_real))
+      for iz in range(0, nz):
+        for iy in range(0, ny):
+          for ix in range(0, nx):
+            if debug:
+              mpy[ix,iy,iz] = self.OmegaMap_py[iz][iy][ix]
+            self.mcpp[ix,iy,iz] = OmegaMap_cpp[iz,iy,ix]
     #
     if debug:
       from cctbx import maptbx
@@ -90,6 +101,8 @@ class compute(object):
 
   def map_data(self): return self.mcpp
 
+  def map_data_inversed(self): return self.ext_vrm.map
+
   def target(self):
     return self.ext_vrm.target
 
@@ -97,6 +110,18 @@ class compute(object):
     self.ext_vrm.compute_gradients(map_data = map_data)
     return self.ext_vrm
 
+  def update(self, bcr_scatterers=None):
+    # Assumes self.bcr_scatterers changes elsewhere in-place
+    if bcr_scatterers is not None:
+      self.bcr_scatterers = bcr_scatterers
+    self.ext_vrm = ext.vrm(
+      Ncrs           = self.n_real,
+      Scrs           = [0,0,0],
+      Nxyz           = self.n_real,
+      unit_cell      = self.unit_cell,
+      bcr_scatterers = self.bcr_scatterers,
+      use_exp_table  = self.use_exp_table)
+    self.ext_vrm.compute(compute_gradients=False)
 
 #-------------------------------------------
 def CalcFuncMap(OmegaMap, ControlMap, Ncrs) :
