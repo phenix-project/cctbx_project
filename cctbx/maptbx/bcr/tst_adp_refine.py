@@ -7,7 +7,7 @@ import mmtbx.model
 import cctbx.maptbx.bcr
 from scitbx.array_family import flex
 import mmtbx.refinement.real_space.adp
-from libtbx.test_utils import approx_equal
+from libtbx.test_utils import approx_equal, not_approx_equal
 import scitbx.minimizers
 from cctbx import adptbx
 
@@ -64,8 +64,29 @@ def get_map_data_and_crystal_gridding(resolution, table):
     debug          = False,
     refinement     = True)
   #
+  map_data_inv = o.map_data_inversed()
   o.gradients(map_data = o.map_data_inversed())
   assert approx_equal(o.target(), 0)
+  # EXAMPLE how to convert VRM map to Phenix convention
+  o = qmap.compute(
+    xray_structure = xrs,
+    n_real         = n_real,
+    resolution     = resolution,
+    resolutions    = None,
+    use_exp_table  = False,
+    debug          = False,
+    refinement     = False)
+  map_data = o.map_data()
+  assert map_data.all()     == (45, 54, 64)
+  assert map_data_inv.all() == (64, 54, 45)
+  assert not_approx_equal(map_data, map_data_inv)
+  nx,ny,nz = map_data.all() # phenix
+  new_map = flex.double(flex.grid([nz,ny,nx])) # AU's VRM convention
+  for iz in range(0, nz):
+    for iy in range(0, ny):
+      for ix in range(0, nx):
+        new_map[iz,iy,ix] = map_data[ix,iy,iz]
+  assert approx_equal(new_map, map_data_inv)
   #
   return o.map_data_inversed(), crystal_gridding, \
     xrs.extract_u_iso_or_u_equiv()*adptbx.u_as_b(1.)
