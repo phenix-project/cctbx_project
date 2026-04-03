@@ -268,7 +268,7 @@ jobs:
           dir ${{ github.workspace }}\modules
 
       - name: Fix broken cache
-        continues-on-error: true
+        continue-on-error: true
         shell: cmd
         run: |
           del /S /Q .\build\lib\_pycbf.pyd 2> nul
