@@ -31,15 +31,14 @@ jobs:
       - name: Check out cctbx_project
         uses: actions/checkout@v6
         with:
-          path: ./modules/cctbx_project
+          path: ~/tmp/cctbx_project
 
       - name: Update other sources and keep cctbx_project checkout
         run: |
           set -xe
           pwd
           ls
-          cp -a ./modules/cctbx_project ~/tmp
-          ln -s ~/tmp/cctbx_project/libtbx/auto_build/bootstrap.py .
+          cp ~/tmp/cctbx_project/libtbx/auto_build/bootstrap.py .
           python bootstrap.py hot update
           cd modules
           rm -fr cctbx_project
