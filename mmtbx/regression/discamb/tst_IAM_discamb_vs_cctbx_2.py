@@ -85,7 +85,7 @@ def test_all_spacegroups():
     # compute the difference between the structure factors
     score, mean_diff, max_diff = compare_structure_factors(
       x=fcalc_cctbx, y=fcalc_discamb)
-    print (sgi, score, mean_diff, max_diff)
+    #print (sgi, score, mean_diff, max_diff)
     # Check if the differences are within the specified tolerance
     assert(score < 0.0003)
     assert(mean_diff < 0.0015)
