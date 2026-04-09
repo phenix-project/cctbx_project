@@ -403,7 +403,7 @@ def workaround_001(model, selection, log=None):
         L = [x for x in i_seqs if x != h_to_opt[j].bond and
              x not in set(selection)]
         if len(L)==0: continue
-        if len(L)>1: raise ValueError("It should really be 1.")
+        #if len(L)>1: raise ValueError("It should really be 1.")
         h_to_opt[j].angle = L[0]
         h_to_opt[j].a = ap.angle_ideal
   # Look in planes

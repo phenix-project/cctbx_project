@@ -3689,7 +3689,8 @@ class _():
     aa_alikes = ['common_amino_acid', 'modified_amino_acid', 'd_amino_acid']
     if(common_residue_names_get_class(name=self.resname) in aa_alikes):
       if(not self.link_to_previous):
-        alla.remove('H')
+        try:               alla.remove('H')
+        except ValueError: pass
         for h in ["H1","H2","H3"]:
           if not h in alla: alla.append(h)
       else:
