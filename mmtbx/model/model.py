@@ -422,6 +422,9 @@ class manager(object):
     """
     return manager.get_default_pdb_interpretation_scope().extract()
 
+  def unset_processed_pdb_file(self):
+    self._processed_pdb_file = None
+
   def get_header_r_free_flags_md5_hexdigest(self):
     """
     XXX Limited to PDB format XXX
@@ -484,7 +487,8 @@ class manager(object):
   def get_scattering_table(self):
     return self.get_xray_structure().get_scattering_table()
 
-  def get_xray_structure(self):
+  def get_xray_structure(self, force=False):
+    if force: self._xray_structure = None
     if(self._xray_structure is None):
       cs = self.crystal_symmetry()
       if cs is None or cs.unit_cell() is None or cs.space_group() is None:
@@ -2097,7 +2101,7 @@ class manager(object):
     # This must happen after process call.
     # Reason: contents of model and _model_input can get out of sync any time.
     self._model_input = None
-    self._processed_pdb_file = None
+    self.unset_processed_pdb_file()
     # Order of calling this matters!
     self.link_records_in_pdb_format = link_record_output(acp)
 
@@ -2147,7 +2151,7 @@ class manager(object):
   def unset_restraints_manager(self):
     self.restraints_manager = None
     self.model_statistics_info = None
-    self._processed_pdb_file = None
+    self.unset_processed_pdb_file()
 
   def raise_clash_guard(self):
     if self._clash_guard_msg is not None:
@@ -3892,6 +3896,8 @@ class manager(object):
     if(len(new_atom_name) < 4): new_atom_name = " " + new_atom_name
     while(len(new_atom_name) < 4): new_atom_name = new_atom_name+" "
     atom_names = [ new_atom_name ] * n_atoms
+    from libtbx import Auto
+    if residue_name is Auto: residue_name = "HOH"
     residue_names = [ residue_name ] * n_atoms
     nonbonded_types = flex.std_string([ "OH2" ] * n_atoms)
     i_seq = find_common_water_resseq_max(pdb_hierarchy=self._pdb_hierarchy)
@@ -4092,7 +4098,7 @@ class manager(object):
     self.get_hierarchy().atoms().reset_i_seq()
     if (reset_labels):
       self._sync_xrs_labels()
-    self._processed_pdb_file = None
+    self.unset_processed_pdb_file()
 
   def _sync_xrs_labels(self):
     for sc, atom in zip(self.get_xray_structure().scatterers(), self.get_hierarchy().atoms()):

@@ -448,6 +448,41 @@ class _():
     for model in ph.models():
       self.append_model(model=model.detached_copy())
 
+  def get_unique_resnames(self):
+    """Returns a list of all unique residue names in the hierarchy."""
+    resnames = []
+    for model in self.models():
+      for chain in model.chains():
+        for residue_group in chain.residue_groups():
+          for atom_group in residue_group.atom_groups():
+            if atom_group.resname not in resnames:
+              resnames.append(atom_group.resname)
+    return resnames
+
+  def get_water_resname(self):
+    """Returns the resname of the first water found, or None if no water."""
+    get_class = iotbx.pdb.common_residue_names_get_class
+    for model in self.models():
+      for chain in model.chains():
+        for residue_group in chain.residue_groups():
+          for atom_group in residue_group.atom_groups():
+            # Return the first resname that belongs to the water class
+            if get_class(name=atom_group.resname) == "common_water":
+              return atom_group.resname
+    return None
+
+  def get_water_max_resseq(self):
+    """Returns the max resseq of water as integer."""
+    get_class = iotbx.pdb.common_residue_names_get_class
+    result = flex.int()
+    for model in self.models():
+      for chain in model.chains():
+        for residue_group in chain.residue_groups():
+          for atom_group in residue_group.atom_groups():
+            if get_class(name=atom_group.resname) == "common_water":
+              result.append(int(atom_group.parent().resseq))
+    return flex.max_default(result, 0)
+
   def chains(self):
     """
     Iterate over all chains in all models.
