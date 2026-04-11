@@ -7,8 +7,9 @@ from libtbx.utils import null_out, Sorry
 from libtbx.test_utils import approx_equal
 from mmtbx.programs import model_vs_sequence
 
-# Minimal PDB with a known sequence: chain A, residues 10-28 (same as in
-# tst_sequence_validation.py so expected output is well-understood).
+# Minimal PDB with a known sequence:
+# chain A, residues 10-28
+# (same as in tst_sequence_validation.py so expected output is well-understood).
 _pdb_str = """\
 ATOM      2  CA  ARG A  10      -6.299  36.344   7.806  1.00 55.20           C
 ATOM     25  CA  TYR A  11      -3.391  33.962   7.211  1.00 40.56           C
@@ -31,10 +32,11 @@ ATOM    263  CA  ARG A  28       1.589  34.719   9.165  1.00 37.04           C
 END
 """
 
-# Sequence that partially matches the model (produces mismatches/gaps).
+# Sequence that partially matches the model
+# (produces mismatches/gaps).
 _seq_mismatch = ">chain_a\nMTTPSHLSDRYELGEILGFGGMSEVHLARD\n"
 
-# Simple 5-residue PDB and a perfectly matching sequence for the 100%-identity test.
+# Simple 5-residue PDB and a perfectly matching sequence for 100%-identity test.
 _pdb_simple = """\
 ATOM      1  CA  GLY A   1       1.000   1.000   1.000  1.00  0.00           C
 ATOM      2  CA  ALA A   2       2.000   1.000   1.000  1.00  0.00           C
@@ -45,6 +47,7 @@ END
 """
 _seq_match = ">chain_a\nGAVLI\n"
 
+# ---------------------------------------------------------------------------
 
 def _write_tmp(suffix, content):
   fd, path = tempfile.mkstemp(suffix=suffix)
@@ -53,12 +56,13 @@ def _write_tmp(suffix, content):
     f.write(content)
   return path
 
-
 # ---------------------------------------------------------------------------
 
 def exercise_with_mismatches():
-  """Run the program with a sequence that has mismatches and gaps relative to
-  the model; verify chain-level statistics."""
+  """
+  Run the program with a sequence that has mismatches and gaps relative to
+  the model; verify chain-level statistics.
+  """
   pdb_fn = _write_tmp(".pdb", _pdb_str)
   seq_fn = _write_tmp(".fa", _seq_mismatch)
   try:
@@ -81,10 +85,13 @@ def exercise_with_mismatches():
     os.remove(pdb_fn)
     os.remove(seq_fn)
 
+# ---------------------------------------------------------------------------
 
 def exercise_perfect_match():
-  """Run the program with a sequence that matches the model exactly; verify
-  100 % identity and no mismatches."""
+  """
+  Run the program with a sequence that matches the model exactly; verify
+  100 % identity and no mismatches.
+  """
   pdb_fn = _write_tmp(".pdb", _pdb_simple)
   seq_fn = _write_tmp(".fa", _seq_match)
   try:
@@ -101,9 +108,12 @@ def exercise_perfect_match():
     os.remove(pdb_fn)
     os.remove(seq_fn)
 
+# ---------------------------------------------------------------------------
 
 def exercise_missing_sequence():
-  """Omitting the sequence file must raise Sorry."""
+  """
+  Omitting the sequence file must raise Sorry.
+  """
   pdb_fn = _write_tmp(".pdb", _pdb_simple)
   try:
     try:
@@ -118,9 +128,12 @@ def exercise_missing_sequence():
   finally:
     os.remove(pdb_fn)
 
+# ---------------------------------------------------------------------------
 
 def exercise_missing_model():
-  """Omitting the model file must raise Sorry."""
+  """
+  Omitting the model file must raise Sorry.
+  """
   seq_fn = _write_tmp(".fa", _seq_match)
   try:
     try:
@@ -135,7 +148,6 @@ def exercise_missing_model():
   finally:
     os.remove(seq_fn)
 
-
 # ---------------------------------------------------------------------------
 
 def run():
@@ -145,6 +157,7 @@ def run():
   exercise_missing_model()
   print("OK")
 
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
   run()
