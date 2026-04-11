@@ -231,6 +231,7 @@ general_tests = [
   "$D/regression/tst_find_ncs.py",
   "$D/regression/tst_minimize_chain.py",
   "$D/regression/tst_sequence_validation.py",
+  "$D/regression/tst_program_model_vs_sequence.py",
   "$D/regression/tst_prune_model.py",
   "$D/regression/tst_real_space_correlation.py",
   "$D/regression/tst_examples.py",

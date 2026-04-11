@@ -51,10 +51,12 @@ phenix.model_vs_sequence model.pdb sequence.fa
     if len(sequences) == 0:
       raise Sorry("There don't appear to be any valid sequences in %s!" % seq_fn)
 
-    v = mmtbx.validation.sequence.validation(
+    self.result = mmtbx.validation.sequence.validation(
       pdb_hierarchy=model.get_hierarchy(),
       sequences=sequences,
       params=self.params,
       log=self.logger)
-    v.show(out=self.logger)
-    return v
+    self.result.show(out=self.logger)
+
+  def get_results(self):
+    return self.result
