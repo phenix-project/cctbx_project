@@ -342,6 +342,11 @@ RSCC.
       model_to_open = self.model_fn_reduce2
     else:
       model_to_open = getattr(self, '_original_model_fn', None)
+    ligand_results = None
+    if self.ligand_manager is not None:
+      ligand_results = [lr.as_picklable_snapshot()
+                        for lr in self.ligand_manager]
     return group_args(
       working_model_fn = model_to_open,
-      ligand_manager   = self.ligand_manager)
+      ligand_manager   = self.ligand_manager,
+      ligand_results   = ligand_results)

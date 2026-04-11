@@ -1115,3 +1115,76 @@ class ligand_result(object):
       n_hbonds = results_hbonds.n_hbonds)
 
     return self._overlaps
+
+  # ----------------------------------------------------------------------------
+
+  def as_picklable_snapshot(self):
+    '''
+    Return a group_args containing only plain Python types (no C++ objects),
+    suitable for pickling by the GUI result-transfer mechanism.
+    The snapshot pre-computes all metrics the GUI needs.
+    '''
+    def _f(v):
+      return float(v) if v is not None else None
+    def _i(v):
+      return int(v) if v is not None else None
+
+    ccs  = self.get_ccs()
+    ov   = self.get_overlaps()
+    adps = self.get_adps()
+    occs = self.get_occupancies()
+    rmsds = self.get_rmsds()
+    mapv  = self.get_map_values()
+
+    # centroid: mean of ligand atom coordinates as plain Python floats
+    xyz = self._atoms_ligand.extract_xyz().mean()
+    centroid = (float(xyz[0]), float(xyz[1]), float(xyz[2]))
+
+    # frag_ccs dict: keys are strings, values floats — safe to pickle as-is
+    frag_ccs_plain = None
+    if ccs is not None and getattr(ccs, 'frag_ccs', None):
+      frag_ccs_plain = {k: float(v) for k, v in ccs.frag_ccs.items()}
+
+    return group_args(
+      id_str   = self.id_str,
+      altloc   = self.altloc,
+      centroid = centroid,
+      ccs = group_args(
+        rscc       = _f(ccs.rscc)       if ccs is not None else None,
+        rscc_sites = _f(ccs.rscc_sites) if ccs is not None else None,
+        frag_ccs   = frag_ccs_plain,
+      ) if ccs is not None else None,
+      overlaps = group_args(
+        n_clashes = _i(ov.n_clashes) if ov is not None else None,
+        n_hbonds  = _i(ov.n_hbonds)  if ov is not None else None,
+      ) if ov is not None else None,
+      adps = group_args(
+        b_min         = _f(adps.b_min)         if adps is not None else None,
+        b_max         = _f(adps.b_max)         if adps is not None else None,
+        b_mean        = _f(adps.b_mean)        if adps is not None else None,
+        b_min_within  = _f(adps.b_min_within)  if adps is not None else None,
+        b_max_within  = _f(adps.b_max_within)  if adps is not None else None,
+        b_mean_within = _f(adps.b_mean_within) if adps is not None else None,
+      ) if adps is not None else None,
+      occupancies = group_args(
+        occ_min  = _f(occs.occ_min)  if occs is not None else None,
+        occ_max  = _f(occs.occ_max)  if occs is not None else None,
+        occ_mean = _f(occs.occ_mean) if occs is not None else None,
+      ) if occs is not None else None,
+      rmsds = group_args(
+        bond_rmsz           = _f(rmsds.bond_rmsz)           if rmsds is not None else None,
+        bond_n              = _i(rmsds.bond_n)               if rmsds is not None else None,
+        bond_n_outliers     = _i(rmsds.bond_n_outliers)      if rmsds is not None else None,
+        angle_rmsz          = _f(rmsds.angle_rmsz)          if rmsds is not None else None,
+        angle_n             = _i(rmsds.angle_n)              if rmsds is not None else None,
+        angle_n_outliers    = _i(rmsds.angle_n_outliers)     if rmsds is not None else None,
+        dihedral_rmsz       = _f(rmsds.dihedral_rmsz)       if rmsds is not None else None,
+        dihedral_n          = _i(rmsds.dihedral_n)           if rmsds is not None else None,
+        dihedral_n_outliers = _i(rmsds.dihedral_n_outliers)  if rmsds is not None else None,
+      ) if rmsds is not None else None,
+      map_values = group_args(
+        percent_bad_at_atom_centers = _f(mapv.percent_bad_at_atom_centers) if mapv is not None else None,
+        n_bad_blobs                 = _i(mapv.n_bad_blobs)                 if mapv is not None else None,
+        percent_bad_blobs           = _f(mapv.percent_bad_blobs)           if mapv is not None else None,
+      ) if mapv is not None else None,
+    )
