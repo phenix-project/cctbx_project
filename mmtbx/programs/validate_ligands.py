@@ -31,6 +31,23 @@ save_reduce2_model = False
   .type = bool
 verbose = False
   .type = bool
+gui
+  .help = GUI-specific parameters
+{
+  output_dir = None
+    .type = path
+    .style = output_dir
+
+  data_column_label = None
+    .type = str
+    .style = noauto renderer:draw_any_label_widget
+    .input_size = 200
+
+  free_column_label = None
+    .type = str
+    .style = noauto renderer:draw_any_label_widget
+    .input_size = 200
+}
 """
 
 # =============================================================================
@@ -176,6 +193,7 @@ RSCC.
     self.model_fn_reduce2 = None
     #
     model_fn = self.data_manager.get_default_model_name()
+    self._original_model_fn = model_fn
     data_fn = self.data_manager.get_default_miller_array_name()
     map_fn = self.data_manager.get_default_real_map_name()
 
@@ -318,6 +336,12 @@ RSCC.
   # ---------------------------------------------------------------------------
 
   def get_results(self):
+    if (self.params.run_reduce2
+        and self.params.save_reduce2_model
+        and self.model_fn_reduce2 is not None):
+      model_to_open = self.model_fn_reduce2
+    else:
+      model_to_open = getattr(self, '_original_model_fn', None)
     return group_args(
-      working_model_fn = self.model_fn_reduce2,
+      working_model_fn = model_to_open,
       ligand_manager   = self.ligand_manager)

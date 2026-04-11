@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
-import time, traceback
+import time, traceback, os
+import libtbx.load_env
 from libtbx.utils import null_out
 import mmtbx.model
 import iotbx.pdb
@@ -16,6 +17,7 @@ lg.setLevel(RDLogger.CRITICAL) # Only show critical errors
 
 def run():
   run_test01()
+  run_test_get_results_fallback()
 
 # ------------------------------------------------------------------------------
 
@@ -92,6 +94,32 @@ def run_test01():
   assert approx_equal(occs_edo.occ_mean, 1.0, eps=0.01)
   assert occs_edo.zero_count == 0
   assert occs_edo.negative_count == 0
+
+# ------------------------------------------------------------------------------
+
+def run_test_get_results_fallback():
+  '''
+  When run_reduce2=False, get_results() must return the original model
+  filename (not a _newH.cif path that was never written to disk).
+  '''
+  from libtbx import env
+  pdb_fname = env.find_in_repositories(
+    relative_path="phenix_regression/pdb/pdb1avd.ent.gz",
+    test=os.path.isfile)
+  if pdb_fname is None:
+    print('phenix_regression not available, skipping')
+    return
+  result = run_program(
+    program_class=val_lig.Program,
+    args=[pdb_fname, 'run_reduce2=False'],
+    logger=null_out())
+  assert result.working_model_fn is not None, \
+    "working_model_fn should not be None when run_reduce2=False"
+  assert result.working_model_fn == pdb_fname, \
+    "working_model_fn=%s expected=%s" % (result.working_model_fn, pdb_fname)
+  assert os.path.isfile(result.working_model_fn), \
+    "working_model_fn path does not exist on disk: %s" % result.working_model_fn
+  print('OK: get_results fallback to original model when run_reduce2=False')
 
 # ------------------------------------------------------------------------------
 
