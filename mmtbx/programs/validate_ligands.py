@@ -339,7 +339,7 @@ RSCC.
     if (self.params.run_reduce2
         and self.params.save_reduce2_model
         and self.model_fn_reduce2 is not None):
-      model_to_open = self.model_fn_reduce2
+      model_to_open = os.path.abspath(self.model_fn_reduce2)
     else:
       model_to_open = getattr(self, '_original_model_fn', None)
     ligand_results = None
