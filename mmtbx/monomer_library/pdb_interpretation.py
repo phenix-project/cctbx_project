@@ -161,6 +161,7 @@ restraints_library_str = """
       .style = bold
     include_modified_amino_acid_in_cdl = False
       .type = bool
+      .style = hidden
     mcl = True
       .type = bool
       .short_caption = Use Metal Coordination Library (MCL)
@@ -184,15 +185,12 @@ restraints_library_str = """
         .short_caption = Use RestraintsLib for DNA and RNA
         .help = Use RestraintsLib for DNA and RNA \
           for geometry restraints
-        .style = hidden
       esd = *phenix csd
         .type = choice
         .short_caption = Apply the e.s.d. values from Phenix or CSD
-        .style = hidden
       factor = 2.0
         .type = float
         .short_caption = Factor applied to the e.s.d. values from CSD (not Phenix)
-        .style = hidden
     }
     cdl_svl = False
       .type = bool
@@ -206,7 +204,6 @@ restraints_library_str = """
       .style = hidden
     hpdl = False
       .type = bool
-      .style = hidden
     user_supplied
       .short_caption = Directory to load user supplied restraints
     {
