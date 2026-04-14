@@ -204,6 +204,7 @@ restraints_library_str = """
       .style = hidden
     hpdl = False
       .type = bool
+    include scope mmtbx.conformation_dependent_library.density_dependent_restraints.ddr_master_params
     user_supplied
       .short_caption = Directory to load user supplied restraints
     {
