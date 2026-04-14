@@ -174,7 +174,7 @@ def master_params():
   return iotbx.phil.parse(master_params_str)
 
 def new_solvent_sites_as_hierarchy_chain(
-      sites, model, params, conformer_indices=None):
+      sites, model, params=None, conformer_indices=None):
   uc = model.crystal_symmetry().unit_cell()
   ort = uc.orthogonalize
   b_iso = flex.mean(model.get_xray_structure(

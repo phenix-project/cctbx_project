@@ -3946,6 +3946,29 @@ class manager(object):
     for sc, atom in zip(self.get_xray_structure().scatterers(), self.get_hierarchy().atoms()):
       sc.label = atom.id_str()
 
+  def add_solvent(
+      self,
+      solvent_xray_structure = None,
+      sites_frac             = None,
+      refine_occupancies     = None,
+      atom_name              = "O",
+      residue_name           = "HOH",
+      chain_id               = "S",
+      refine_adp             = "isotropic"):
+    assert [solvent_xray_structure, sites_frac].count(None) == 1
+    if sites_frac is None:
+      sites_frac = solvent_xray_structure.sites_frac()
+    import mmtbx.solvent.ordered_solvent as osm
+    params = osm.master_params().extract()
+    params.output_chain_id     = chain_id
+    params.output_residue_name = residue_name
+    params.output_atom_name    = atom_name
+    params.refine_occupancies  = refine_occupancies
+    osm.add_solvent_to_model_inplace(
+      sites = sites_frac,
+      model = self,
+      params = params)
+
   def convert_atom(self,
       i_seq,
       scattering_type,
