@@ -604,20 +604,29 @@ class ligand_result(object):
   # ----------------------------------------------------------------------------
 
   def _fragment(self):
+    import os
+    import tempfile
     ag_ligand = self._atoms_ligand[0].parent()
     mon_lib_srv = self.model.get_mon_lib_srv()
     cif_object, ani = mon_lib_srv.get_comp_comp_id_and_atom_name_interpretation(
       residue_name=ag_ligand.resname, atom_names=ag_ligand.atoms().extract_name())
     #print(dir(cif_object))
     #cif_object.show()
-    if self.params.save_fragment_png:
-      png_fn = self.fn_string + '.png'
-    else:
-      png_fn = None
+    # Always write PNG to a temp file so the GUI can display the fragment
+    # diagram without repeating the fragmentation step.
+    tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    tf.close()
     self.ligand_rigid_components_isels = rdkit_utils.get_cctbx_isel_for_rigid_components(
       atom_group = ag_ligand,
       cif_object = cif_object,
-      filename = png_fn)
+      filename = tf.name)
+    with open(tf.name, 'rb') as fh:
+      data = fh.read()
+    self._fragment_png_bytes = data if data else None
+    if self.params.save_fragment_png:
+      os.rename(tf.name, self.fn_string + '.png')
+    else:
+      os.unlink(tf.name)
 
     # -------------------------------------------------------------------------
     # START hack for displaying fragments with individual colors in Coot
@@ -1120,6 +1129,13 @@ class ligand_result(object):
 
   # ----------------------------------------------------------------------------
 
+  def get_fragment_png_bytes(self):
+    '''
+    Return the fragment PNG bytes computed during _fragment().
+    Returns None if fragmentation was not run or produced no image.
+    '''
+    return getattr(self, '_fragment_png_bytes', None)
+
   def as_picklable_snapshot(self):
     '''
     Return a group_args containing only plain Python types (no C++ objects),
@@ -1142,10 +1158,12 @@ class ligand_result(object):
     xyz = self._atoms_ligand.extract_xyz().mean()
     centroid = (float(xyz[0]), float(xyz[1]), float(xyz[2]))
 
-    # frag_ccs dict: keys are strings, values floats — safe to pickle as-is
+    # frag_ccs dict: keys are flex.size_t (C++ objects) — replace with plain
+    # integers so the dict is picklable.  The GUI only uses .values(), so the
+    # key type does not matter for display.
     frag_ccs_plain = None
     if ccs is not None and getattr(ccs, 'frag_ccs', None):
-      frag_ccs_plain = {k: float(v) for k, v in ccs.frag_ccs.items()}
+      frag_ccs_plain = {i: float(v) for i, v in enumerate(ccs.frag_ccs.values())}
 
     return group_args(
       id_str   = self.id_str,
@@ -1189,4 +1207,5 @@ class ligand_result(object):
         n_bad_blobs                 = _i(mapv.n_bad_blobs)                 if mapv is not None else None,
         percent_bad_blobs           = _f(mapv.percent_bad_blobs)           if mapv is not None else None,
       ) if mapv is not None else None,
+      fragment_png_bytes = self.get_fragment_png_bytes(),
     )
