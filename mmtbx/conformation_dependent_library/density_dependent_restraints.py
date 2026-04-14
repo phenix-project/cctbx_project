@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division, print_function
 import sys
 
-ddr_master_params = '''
-ddr
+ddw_master_params = '''
+ddw
   .style = hidden
   .short_caption = Density dependent restraints
 {
