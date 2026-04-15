@@ -604,29 +604,19 @@ class ligand_result(object):
   # ----------------------------------------------------------------------------
 
   def _fragment(self):
-    import os
-    import tempfile
     ag_ligand = self._atoms_ligand[0].parent()
     mon_lib_srv = self.model.get_mon_lib_srv()
     cif_object, ani = mon_lib_srv.get_comp_comp_id_and_atom_name_interpretation(
       residue_name=ag_ligand.resname, atom_names=ag_ligand.atoms().extract_name())
     #print(dir(cif_object))
     #cif_object.show()
-    # Always write PNG to a temp file so the GUI can display the fragment
-    # diagram without repeating the fragmentation step.
-    tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-    tf.close()
-    self.ligand_rigid_components_isels = rdkit_utils.get_cctbx_isel_for_rigid_components(
+    mol, rdkit_to_cctbx = rdkit_utils.get_rdkit_mol_from_atom_group_and_cif_obj(
       atom_group = ag_ligand,
-      cif_object = cif_object,
-      filename = tf.name)
-    with open(tf.name, 'rb') as fh:
-      data = fh.read()
-    self._fragment_png_bytes = data if data else None
-    if self.params.save_fragment_png:
-      os.rename(tf.name, self.fn_string + '.png')
-    else:
-      os.unlink(tf.name)
+      cif_object = cif_object)
+    self.ligand_rigid_components_isels, self._frag_mol, self._rdkit_frags = \
+      rdkit_utils.get_rigid_components(mol, rdkit_to_cctbx)
+    # PNG generation is deferred to as_picklable_snapshot() where CC values
+    # are available and can be annotated directly onto the figure.
 
     # -------------------------------------------------------------------------
     # START hack for displaying fragments with individual colors in Coot
@@ -1129,12 +1119,43 @@ class ligand_result(object):
 
   # ----------------------------------------------------------------------------
 
-  def get_fragment_png_bytes(self):
+  def _make_annotated_fragment_png(self, frag_ccs_plain):
     '''
-    Return the fragment PNG bytes computed during _fragment().
-    Returns None if fragmentation was not run or produced no image.
+    Draw the fragment diagram with CC values annotated on each fragment.
+    frag_ccs_plain: dict {int -> float} as built in as_picklable_snapshot(),
+                    or None when no CCs are available.
+    Returns PNG bytes, or None if drawing is not possible.
     '''
-    return getattr(self, '_fragment_png_bytes', None)
+    import os
+    import tempfile
+    frag_mol   = getattr(self, '_frag_mol',    None)
+    rdkit_frags = getattr(self, '_rdkit_frags', None)
+    if frag_mol is None or rdkit_frags is None:
+      return None
+    frag_cc_list = None
+    if frag_ccs_plain:
+      frag_cc_list = [frag_ccs_plain[i] for i in sorted(frag_ccs_plain)]
+    tf = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    tf.close()
+    try:
+      rdkit_utils.draw_colored_fragments(
+        frag_mol, rdkit_frags, filename=tf.name, frag_ccs=frag_cc_list)
+      with open(tf.name, 'rb') as fh:
+        data = fh.read()
+    except Exception:
+      import traceback
+      print('Warning: fragment PNG generation failed:')
+      traceback.print_exc()
+      data = b''
+    finally:
+      if self.params.save_fragment_png:
+        os.rename(tf.name, self.fn_string + '.png')
+      else:
+        try:
+          os.unlink(tf.name)
+        except OSError:
+          pass
+    return data if data else None
 
   def as_picklable_snapshot(self):
     '''
@@ -1164,6 +1185,10 @@ class ligand_result(object):
     frag_ccs_plain = None
     if ccs is not None and getattr(ccs, 'frag_ccs', None):
       frag_ccs_plain = {i: float(v) for i, v in enumerate(ccs.frag_ccs.values())}
+
+    # Generate the annotated fragment PNG now that CC values are known.
+    # draw_colored_fragments overlays each CC on its fragment centroid.
+    fragment_png_bytes = self._make_annotated_fragment_png(frag_ccs_plain)
 
     return group_args(
       id_str   = self.id_str,
@@ -1207,5 +1232,5 @@ class ligand_result(object):
         n_bad_blobs                 = _i(mapv.n_bad_blobs)                 if mapv is not None else None,
         percent_bad_blobs           = _f(mapv.percent_bad_blobs)           if mapv is not None else None,
       ) if mapv is not None else None,
-      fragment_png_bytes = self.get_fragment_png_bytes(),
+      fragment_png_bytes = fragment_png_bytes,
     )

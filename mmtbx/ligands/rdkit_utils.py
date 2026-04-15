@@ -220,7 +220,7 @@ def get_cctbx_isel_for_rigid_components(atom_group,
   mol, rdkit_to_cctbx = get_rdkit_mol_from_atom_group_and_cif_obj(
     atom_group = atom_group,
     cif_object = cif_object)
-  cctbx_rigid_components = get_rigid_components(
+  cctbx_rigid_components, _mol, _frags = get_rigid_components(
     mol, rdkit_to_cctbx, filter_lone_linkers, filename)
 
   return cctbx_rigid_components
@@ -238,7 +238,8 @@ def get_rigid_components(mol,
     matches = mol.GetSubstructMatches(rotatable_pattern)
   except Exception as e:
     print('Failed to fragment the molecule.')
-    return [flex.size_t(list(rdkit_to_cctbx.values()))]
+    frags = Chem.GetMolFrags(mol, asMols=False)
+    return [flex.size_t(list(rdkit_to_cctbx.values()))], mol, list(frags)
 
   candidate_cut_bonds = []
   min_heavy_atoms = 2
@@ -295,17 +296,17 @@ def get_rigid_components(mol,
 
   # Fragment
   if not final_bonds_to_cut:
-    draw_colored_fragments(mol, Chem.GetMolFrags(mol, asMols=False), filename=filename)
-    return [flex.size_t(list(rdkit_to_cctbx.values()))]
+    rdkit_frags = list(Chem.GetMolFrags(mol, asMols=False))
+    draw_colored_fragments(mol, rdkit_frags, filename=filename)
+    return [flex.size_t(list(rdkit_to_cctbx.values()))], mol, rdkit_frags
 
   fragmented_mol = Chem.FragmentOnBonds(mol, final_bonds_to_cut, addDummies=False)
-  raw_fragments = Chem.GetMolFrags(fragmented_mol, asMols=False)
+  raw_fragments = list(Chem.GetMolFrags(fragmented_mol, asMols=False))
 
   # Convert to CCTBX format
   cctbx_rigid_components = []
 
-  merged_fragments = raw_fragments
-  for frag in merged_fragments:
+  for frag in raw_fragments:
     component_indices = flex.size_t()
     for rd_idx in frag:
       global_idx = rdkit_to_cctbx[rd_idx]
@@ -314,7 +315,7 @@ def get_rigid_components(mol,
 
   draw_colored_fragments(mol, raw_fragments, filename=filename)
 
-  return cctbx_rigid_components
+  return cctbx_rigid_components, mol, raw_fragments
 
 # ------------------------------------------------------------------------------
 
@@ -407,11 +408,14 @@ def _filter_isolated_linkers(candidate_cut_bonds, mol, fragment_size_map):
 
 # ------------------------------------------------------------------------------
 
-def draw_colored_fragments(mol, rdkit_frags, filename, use_atom_names=False):
+def draw_colored_fragments(mol, rdkit_frags, filename, use_atom_names=False,
+                           frag_ccs=None):
   """
   1. Removes all H atoms.
   2. Strips all charges and implicit H properties (forces clean drawing).
   3. Maps colors from the original fragmented indices to the new clean molecule.
+  frag_ccs: optional list of CC floats, one per fragment in rdkit_frags order.
+            When provided, each CC value is drawn at the centroid of its fragment.
   """
   if filename is None: return
 
@@ -492,6 +496,7 @@ def draw_colored_fragments(mol, rdkit_frags, filename, use_atom_names=False):
 
   opts = drawer.drawOptions()
   opts.fillHighlights = True
+  opts.padding = 0.05  # tight fit; CC label strip is added via PIL below
 
   drawer.DrawMolecule(
     mol_viz,
@@ -500,11 +505,80 @@ def draw_colored_fragments(mol, rdkit_frags, filename, use_atom_names=False):
     highlightBonds=list(new_bond_highlights.keys()),
     highlightBondColors=new_bond_highlights
   )
-  drawer.FinishDrawing()
 
-  # 9. Save
+  # Collect canvas-space (pixel) x positions for each fragment centroid and
+  # the pixel y of the lowest atom, so labels sit just below the molecule.
+  # GetDrawCoords must be called after DrawMolecule but before FinishDrawing.
+  frag_pixel_xs = {}
+  max_atom_canvas_y = 0
+  if frag_ccs is not None:
+    from rdkit.Geometry import rdGeometry
+    conf = mol_viz.GetConformer()
+    frag_mol_pts = {}
+    for new_idx, frag_id in new_idx_to_frag_id.items():
+      pos = conf.GetAtomPosition(new_idx)
+      frag_mol_pts.setdefault(frag_id, []).append((pos.x, pos.y))
+      canvas_pt = drawer.GetDrawCoords(rdGeometry.Point2D(pos.x, pos.y))
+      if canvas_pt.y > max_atom_canvas_y:
+        max_atom_canvas_y = canvas_pt.y
+    for frag_id, pts in frag_mol_pts.items():
+      cx = sum(x for x, y in pts) / len(pts)
+      cy = sum(y for x, y in pts) / len(pts)
+      canvas_pt = drawer.GetDrawCoords(rdGeometry.Point2D(cx, cy))
+      frag_pixel_xs[frag_id] = canvas_pt.x
+
+  drawer.FinishDrawing()
+  png_bytes = drawer.GetDrawingText()
+
+  # 9. Composite CC labels onto the PNG using PIL so text is always horizontal.
+  #    Row 1: "RSCC:" left-aligned, placed just below the lowest atom.
+  #    Row 2: per-fragment CC values centred at each fragment's centroid x.
+  #    The canvas is extended only if the text would otherwise be clipped.
+  if frag_ccs is not None and frag_pixel_xs:
+    try:
+      from PIL import Image, ImageDraw as PILDraw, ImageFont
+      import io as _io
+      font_size = 22
+      row_h = font_size + 6
+      # Extra pixels below the lowest atom to clear atom symbols and highlights
+      margin = 15
+      y_row1 = int(max_atom_canvas_y) + margin
+      y_row2 = y_row1 + row_h
+      needed_h = y_row2 + row_h // 2 + 4
+      canvas_h = max(height, needed_h)
+
+      img = Image.open(_io.BytesIO(png_bytes)).convert('RGBA')
+      new_img = Image.new('RGBA', (width, canvas_h), (255, 255, 255, 255))
+      new_img.paste(img, (0, 0))
+      draw = PILDraw.Draw(new_img)
+      try:
+        font = ImageFont.load_default(size=font_size)
+      except TypeError:
+        font = ImageFont.load_default()
+      # Row 1: "RSCC:" at the left margin
+      try:
+        draw.text((6, y_row1), 'RSCC:', fill=(80, 80, 80), font=font, anchor='lt')
+      except TypeError:
+        draw.text((6, y_row1), 'RSCC:', fill=(80, 80, 80), font=font)
+      # Row 2: CC values centred at each fragment's centroid x
+      for frag_id in sorted(frag_pixel_xs):
+        if frag_id >= len(frag_ccs):
+          continue
+        label = '%.2f' % frag_ccs[frag_id]
+        px = int(frag_pixel_xs[frag_id])
+        try:
+          draw.text((px, y_row2), label, fill=(0, 0, 0), font=font, anchor='mt')
+        except TypeError:
+          draw.text((px, y_row2), label, fill=(0, 0, 0), font=font)
+      out = _io.BytesIO()
+      new_img.save(out, format='PNG')
+      png_bytes = out.getvalue()
+    except ImportError:
+      pass  # PIL not available; save without CC labels
+
+  # 10. Save
   with open(filename, 'wb') as f:
-    f.write(drawer.GetDrawingText())
+    f.write(png_bytes)
 
   print(f"PNG saved to {filename}")
 
