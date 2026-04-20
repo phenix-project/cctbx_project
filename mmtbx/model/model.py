@@ -81,6 +81,7 @@ import math
 from mmtbx.monomer_library import pdb_interpretation
 
 from cctbx import geometry_restraints
+from cctbx import geometry
 from cctbx.geometry_restraints.linking_class import linking_class
 
 time_model_show = 0.0
@@ -177,6 +178,96 @@ class xh_connectivity_table2(object):
           if(sct in ["H","D"]): ih = i
         if("H" in h and not o.all_eq(o[0])):
           self.table.setdefault(ih).append(p.i_seqs)
+
+class restraints_scale_manager(object):
+
+  def __init__(self, model):
+    self.model         = model
+    self.hd_selection  = model.get_xray_structure().hd_selection()
+    self.total_bonds   = 0
+    self.total_angles  = 0
+    self.scaled_bonds  = 0
+    self.scaled_angles = 0
+    self.uc            = model.crystal_symmetry().unit_cell()
+    g                  = self.model.get_restraints_manager().geometry
+    # BONDS
+    self.original_bond_weights = flex.double()
+    self.current_bond_weights  = flex.double()
+    bond_proxies_simple, asu = g.get_all_bond_proxies(
+      sites_cart = self.model.get_sites_cart())
+    for proxy in bond_proxies_simple:
+      self.total_bonds+=1
+      self.original_bond_weights.append(proxy.weight)
+      self.current_bond_weights.append(proxy.weight)
+    self.scale_counts_bonds = flex.int(self.original_bond_weights.size(), 0)
+    # ANGLES
+    self.original_angle_weights = flex.double()
+    self.current_angle_weights  = flex.double()
+    for proxy in g.angle_proxies:
+      self.total_angles+=1
+      self.original_angle_weights.append(proxy.weight)
+      self.current_angle_weights.append(proxy.weight)
+    self.scale_counts_angles = flex.int(self.original_angle_weights.size(), 0)
+
+  def scale_bonds(self, factor, cutoff, second_factor = 2):
+    g = self.model.get_restraints_manager().geometry
+    bond_proxies_simple, asu = g.get_all_bond_proxies(
+      sites_cart = self.model.get_sites_cart())
+    sites_frac = self.model.get_sites_frac()
+    for k, proxy in enumerate(bond_proxies_simple):
+      i_seq, j_seq = proxy.i_seqs
+      if self.hd_selection[i_seq] or self.hd_selection[j_seq]: continue
+      dist_ideal = proxy.distance_ideal
+      dist_model = self.uc.distance(sites_frac[i_seq], sites_frac[j_seq])
+      delta = abs(dist_ideal-dist_model)
+      if delta > cutoff:
+        self.scaled_bonds+=1
+        if self.scale_counts_bonds[k]==0:
+          proxy.weight = proxy.weight * factor
+        else:
+          proxy.weight = proxy.weight * second_factor
+        self.scale_counts_bonds[k] += 1
+      if delta < 0.01:
+        proxy.weight = proxy.weight / second_factor
+      self.current_bond_weights[k] = proxy.weight
+
+  def scale_angles(self, factor, cutoff, second_factor = 2):
+    g = self.model.get_restraints_manager().geometry
+    sites_cart = self.model.get_sites_cart()
+    for k, proxy in enumerate(g.angle_proxies):
+      i_seq,j_seq,k_seq = proxy.i_seqs
+      angle_ideal = proxy.angle_ideal
+      sites = (sites_cart[i_seq], sites_cart[j_seq], sites_cart[k_seq])
+      angle_model = geometry.angle(sites).angle_model
+      delta = abs(angle_ideal-angle_model)
+      if delta > cutoff:
+        self.scaled_angles+=1
+        if self.scale_counts_angles[k]==0:
+          proxy.weight = proxy.weight * factor
+        else:
+          proxy.weight = proxy.weight * second_factor
+        self.scale_counts_angles[k] += 1
+      if delta < 1.5:
+        proxy.weight = proxy.weight / second_factor
+      self.current_angle_weights[k] = proxy.weight
+
+  def unscale(self):
+    g = self.model.get_restraints_manager().geometry
+    bond_proxies_simple, asu = g.get_all_bond_proxies(
+      sites_cart = self.model.get_sites_cart())
+    for k, proxy in enumerate(bond_proxies_simple):
+      proxy.weight = self.original_bond_weights[k]
+    for k, proxy in enumerate(g.angle_proxies):
+      proxy.weight = self.original_angle_weights[k]
+
+  def rescale(self):
+    g = self.model.get_restraints_manager().geometry
+    bond_proxies_simple, asu = g.get_all_bond_proxies(
+      sites_cart = self.model.get_sites_cart())
+    for k, proxy in enumerate(bond_proxies_simple):
+      proxy.weight = self.current_bond_weights[k]
+    for k, proxy in enumerate(g.angle_proxies):
+      proxy.weight = self.current_angle_weights[k]
 
 class manager(object):
   """
@@ -307,6 +398,7 @@ class manager(object):
     self.get_hierarchy().atoms().reset_i_seq()
     ########### Allow access to methods from pdb_hierarchy directly ######
     self.set_up_methods_from_hierarchy() # Allow methods from hierarchy
+    self.rsm = None
 
   @classmethod
   def from_sites_cart(cls,
@@ -1435,7 +1527,7 @@ class manager(object):
     else:
       return self.ias_manager.get_ias_selection()
 
-  def get_bonds_rmsd(self, use_hydrogens=False):
+  def get_bonds_rmsd(self, include_angles=False, use_hydrogens=False):
     assert self.restraints_manager is not None
     if(use_hydrogens):
       rm = self.restraints_manager
@@ -1448,7 +1540,11 @@ class manager(object):
       rm.geometry.energies_sites(
         sites_cart        = sc,
         compute_gradients = False)
-    return energies_sites.bond_deviations()[2]
+    if include_angles:
+      return energies_sites.bond_deviations()[2],\
+             energies_sites.angle_deviations()[2]
+    else:
+      return energies_sites.bond_deviations()[2]
 
   def apply_selection_string(self, selection_string):
     if not selection_string:
@@ -2089,11 +2185,13 @@ class manager(object):
     #
     if(make_restraints):
       self._setup_restraints_manager(
-       pdb_interpretation_params = pdb_interpretation_params,
-       grm_normalization         = grm_normalization,
-       plain_pairs_radius        = plain_pairs_radius,
-       custom_nb_excl            = custom_nb_excl,
-       run_clash_guard           = run_clash_guard)
+        pdb_interpretation_params = pdb_interpretation_params,
+        grm_normalization         = grm_normalization,
+        plain_pairs_radius        = plain_pairs_radius,
+        custom_nb_excl            = custom_nb_excl,
+        run_clash_guard           = run_clash_guard)
+      if self.crystal_symmetry() is not None:
+        self.rsm = restraints_scale_manager(model = self)
     #
     if self._processed_pdb_file:
       self._clash_guard_msg = self._processed_pdb_file.clash_guard(
@@ -2104,6 +2202,20 @@ class manager(object):
     self.unset_processed_pdb_file()
     # Order of calling this matters!
     self.link_records_in_pdb_format = link_record_output(acp)
+
+  def scale_restraints(self, factor, bond_cutoff, angle_cutoff):
+    if self.rsm is None: return
+    if abs(factor)<1.e-9: return
+    self.rsm.scale_bonds( factor = factor, cutoff=bond_cutoff)
+    self.rsm.scale_angles(factor = factor, cutoff=angle_cutoff)
+
+  def unscale_restraints(self):
+    if self.rsm is None: return
+    self.rsm.unscale()
+
+  def rescale_restraints(self):
+    if self.rsm is None: return
+    self.rsm.rescale()
 
   def has_atoms_in_special_positions(self, selection, log=None):
     pdb_hierarchy = self.get_hierarchy()
