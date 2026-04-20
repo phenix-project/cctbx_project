@@ -256,7 +256,7 @@ def run(filename):
   from iotbx import cif
   if not os.path.exists(filename): return None
   complete_cif_data = {}
-  cm = cif.reader(filename, strict=False, raise_if_errors=False).model()
+  cm = cif.reader(filename, strict=False).model()
   for code, rc in cm.items():
     for key, item in rc.items():
       cif_key = key.split('.')[0]
