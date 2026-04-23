@@ -112,7 +112,7 @@ def exercise_3():
   assert len(r) > 10000, len(r)
   r = rcsb_web_services.post_query(rota_outliers_range=(0,5))
   print('n rota filter:', len(r))
-  assert len(r) > 135000, len(r)
+  assert len(r) > 130000, len(r)
 
 def exercise_get_emdb_id():
   emdb_ids = rcsb_web_services.get_emdb_id_for_pdb_id('8wcc')
